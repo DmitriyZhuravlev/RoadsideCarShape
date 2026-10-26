@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\caption{What families of methods need and produce. ``3D labels'': labelled 3D boxes or shapes for training.}
+\label{tab:compare}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{p{3.7cm}p{1.5cm}p{1.6cm}p{1.4cm}p{3.0cm}}
+\toprule
+family & training data & input & output & main limitation here \\
+\midrule
+learned box detectors \cite{smoke,monodle,monoflex,fcos3d} & 3D labels & one image & 3D box & no shape; trained per camera type \\
+learned roadside detectors \cite{bevheight} & 3D labels & one image & 3D box & no shape; needs roadside labels \\
+geometric box lifting \cite{deep3dbox,lift,efficient_orig} & 2D labels or none & one image & 3D box & size prior, no shape \\
+learned shape models \cite{kar2015,deepmanta,rcnn3d} & CAD / 3D shapes & one image & shape & shape prior; not shown at 60~m \\
+visual hull, space carving \cite{laurentini,spacecarving} & none & many cameras & shape & needs widely spread views \\
+multibody SfM \cite{ozden2010,kumar2017} & none & video & points / depth & sparse, no closed shape \\
+\textbf{ours} & none & video of a fixed camera & closed shape & needs motion; fails end-on \\
+\bottomrule
+\end{tabular}
+\end{table}

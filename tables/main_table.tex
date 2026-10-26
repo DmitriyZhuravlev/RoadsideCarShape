@@ -1,0 +1,24 @@
+\begin{table}[t]
+\centering
+\caption{Cars against their accumulated LiDAR (mean over the evaluated cars). IoU against the raw and the gap-closed reference, footprint IoU and height error against the closed one, size errors against the labelled box. The labelled box and a box of our own estimated size are scored in the same way.}
+\label{tab:main}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccccc}
+\toprule
+ & & \multicolumn{2}{c}{solid IoU} & footprint & height & \multicolumn{3}{c}{size error (m)} \\
+\cmidrule(lr){3-4}\cmidrule(lr){7-9}
+ & & raw & closed & IoU & err.\ (cm) & $L$ & $W$ & $H$ \\
+\midrule
+\multirow{4}{*}{A (20 cars)} & labelled box & 0.384 & 0.581 & 0.691 & -- & 0 & 0 & 0 \\
+ & box of our size & 0.353 & 0.569 & -- & -- & 0.58 & 0.15 & 0.34 \\
+ & best single window & 0.239 & 0.301 & -- & -- & -- & -- & -- \\
+ & \textbf{ours} & \textbf{0.414} & \textbf{0.608} & 0.724 & 25.6 & 0.58 & 0.15 & 0.34 \\
+\midrule
+\multirow{4}{*}{B (7 cars)} & labelled box & 0.380 & 0.550 & 0.693 & -- & 0 & 0 & 0 \\
+ & box of our size & 0.327 & 0.485 & -- & -- & 2.27 & 0.19 & 0.27 \\
+ & best single window & 0.228 & 0.272 & -- & -- & -- & -- & -- \\
+ & \textbf{ours} & \textbf{0.372} & \textbf{0.492} & 0.577 & 27.1 & 2.27 & 0.19 & 0.27 \\
+\bottomrule
+\end{tabular}}
+\end{table}

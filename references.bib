@@ -1,0 +1,393 @@
+% Entries copied from UnifiedArticle/references.bib (keys unchanged), plus additions below.
+
+@inproceedings{lift,
+  author    = {Zhuravlev, Dmitriy},
+  title     = {Lifting 2{D} Object Detection to 3{D}: Geometric Approach in Bird-Eye-View},
+  booktitle = {Artificial Intelligence Trends in Systems (CSOC 2022)},
+  editor    = {Silhavy, Radek},
+  series    = {Lecture Notes in Networks and Systems},
+  volume    = {502},
+  publisher = {Springer},
+  year      = {2022},
+}
+
+@article{moving_orig,
+  author  = {Zhuravlev, Dmitriy},
+  title   = {Moving Object 3{D} Detection and Segmentation Using Optical Flow Clustering},
+  note    = {Manuscript},
+  year    = {2023}
+}
+
+@incollection{efficient_orig,
+  author    = {Zhuravlev, Dmitriy},
+  title     = {Towards Real-time 3{D} Object Detection through Inverse Perspective Mapping},
+  year      = {2024},
+  doi       = {10.1007/978-3-031-54813-0_34}
+}
+
+%% --- Geometry-based monocular 3D detection ---
+
+@inproceedings{deep3dbox,
+  author    = {Mousavian, Arsalan and Anguelov, Dragomir and Flynn, John and Ko{\v{s}}eck{\'a}, Jana},
+  title     = {3{D} Bounding Box Estimation Using Deep Learning and Geometry},
+  booktitle = {CVPR},
+  year      = {2017},
+  doi       = {10.1109/CVPR.2017.597}
+}
+
+@inproceedings{smoke,
+  author    = {Liu, Zechen and Wu, Zizhang and T{\'o}th, Roland},
+  title     = {{SMOKE}: Single-Stage Monocular 3{D} Object Detection via Keypoint Estimation},
+  booktitle = {CVPR Workshops},
+  year      = {2020},
+  note      = {arXiv:2002.10111}
+}
+
+@inproceedings{monodle,
+  author    = {Ma, Xinzhu and Zhang, Yinmin and Xu, Dan and Zhou, Dongzhan and Yi, Shuai and Li, Haojie and Ouyang, Wanli},
+  title     = {Delving into Localization Errors for Monocular 3{D} Object Detection},
+  booktitle = {CVPR},
+  year      = {2021},
+  note      = {arXiv:2103.16237}
+}
+
+@inproceedings{monoflex,
+  author    = {Zhang, Yunpeng and Lu, Jiwen and Zhou, Jie},
+  title     = {Objects are Different: Flexible Monocular 3{D} Object Detection},
+  booktitle = {CVPR},
+  year      = {2021},
+  note      = {arXiv:2104.02323}
+}
+
+@inproceedings{gupnet,
+  author    = {Lu, Yan and Ma, Xinzhu and Yang, Lei and Zhang, Tianzhu and Liu, Yating and Chu, Qi and Yan, Junjie and Ouyang, Wanli},
+  title     = {Geometry Uncertainty Projection Network for Monocular 3{D} Object Detection},
+  booktitle = {ICCV},
+  year      = {2021},
+  note      = {arXiv:2107.13774}
+}
+
+@inproceedings{caddn,
+  author    = {Reading, Cody and Harakeh, Ali and Chae, Julia and Waslander, Steven L.},
+  title     = {Categorical Depth Distribution Network for Monocular 3{D} Object Detection},
+  booktitle = {CVPR},
+  year      = {2021},
+  note      = {arXiv:2103.01100}
+}
+
+@inproceedings{pseudolidar,
+  author    = {Wang, Yan and Chao, Wei-Lun and Garg, Divyansh and Hariharan, Bharath and Campbell, Mark and Weinberger, Kilian Q.},
+  title     = {Pseudo-{LiDAR} from Visual Depth Estimation: Bridging the Gap in 3{D} Object Detection for Autonomous Driving},
+  booktitle = {CVPR},
+  year      = {2019},
+  note      = {arXiv:1812.04244}
+}
+
+@inproceedings{fcos3d,
+  author    = {Wang, Tai and Zhu, Xinge and Pang, Jiangmiao and Lin, Dahua},
+  title     = {{FCOS3D}: Fully Convolutional One-Stage Monocular 3{D} Object Detection},
+  booktitle = {ICCV Workshops},
+  year      = {2021},
+  note      = {arXiv:2104.10956}
+}
+
+@article{bevdet,
+  title   = {{BEVDet}: High-Performance Multi-Camera 3{D} Object Detection in Bird-Eye-View},
+  journal = {arXiv preprint arXiv:2112.11790},
+  year    = {2021}
+}
+
+@article{bevdepth,
+  title   = {{BEVDepth}: Acquisition of Reliable Depth for Multi-view 3{D} Object Detection},
+  journal = {arXiv preprint arXiv:2206.10092},
+  year    = {2022}
+}
+
+@article{depthanything,
+  author  = {Yang, Lihe and Kang, Bingyi and Huang, Zilong and Xu, Xiaogang and Feng, Jiashi and Zhao, Hengshuang},
+  title   = {Depth Anything: Unleashing the Power of Large-Scale Unlabeled Data},
+  journal = {arXiv preprint arXiv:2401.10891},
+  year    = {2024}
+}
+
+@article{metric3dv2,
+  title   = {Metric3{D} v2: A Versatile Monocular Geometric Foundation Model for Zero-shot Metric Depth and Surface Normal Estimation},
+  journal = {IEEE TPAMI},
+  year    = {2024},
+  note    = {arXiv:2404.15506}
+}
+
+@inproceedings{maskrcnn,
+  author    = {He, Kaiming and Gkioxari, Georgia and Doll{\'a}r, Piotr and Girshick, Ross},
+  title     = {Mask {R-CNN}},
+  booktitle = {ICCV},
+  year      = {2017}
+}
+
+@book{hartley_zisserman,
+  author    = {Hartley, Richard and Zisserman, Andrew},
+  title     = {Multiple View Geometry in Computer Vision},
+  publisher = {Cambridge University Press},
+  year      = {2003}
+}
+
+@inproceedings{kitti,
+  author    = {Geiger, Andreas and Lenz, Philip and Urtasun, Raquel},
+  title     = {Are We Ready for Autonomous Driving? The {KITTI} Vision Benchmark Suite},
+  booktitle = {CVPR},
+  year      = {2012}
+}
+
+@inproceedings{dubska_diamond_space,
+  author    = {Dubsk{\'a}, Mark{\'e}ta and Herout, Adam},
+  title     = {Real Projective Plane Mapping for Detection of Orthogonal Vanishing Points},
+  booktitle = {BMVC},
+  year      = {2013}
+}
+
+@article{lucas_kanade,
+  author  = {Lucas, Bruce D. and Kanade, Takeo},
+  title   = {An Iterative Image Registration Technique with an Application to Stereo Vision},
+  journal = {Proceedings of the 7th International Joint Conference on Artificial Intelligence},
+  pages   = {674--679},
+  year    = {1981}
+}
+
+@inproceedings{farneback,
+  author    = {Farneb{\"a}ck, Gunnar},
+  title     = {Two-Frame Motion Estimation Based on Polynomial Expansion},
+  booktitle = {Scandinavian Conference on Image Analysis (SCIA)},
+  pages     = {363--370},
+  year      = {2003}
+}
+
+@article{fischler_bolles_ransac,
+  author  = {Fischler, Martin A. and Bolles, Robert C.},
+  title   = {Random Sample Consensus: A Paradigm for Model Fitting with Applications to Image Analysis and Automated Cartography},
+  journal = {Communications of the ACM},
+  volume  = {24},
+  number  = {6},
+  pages   = {381--395},
+  year    = {1981}
+}
+
+%% --- Additions for this article -------------------------------------------------------------------------
+
+@inproceedings{dairv2x,
+  author    = {Yu, Haibao and Luo, Yizhen and Shu, Mao and others},
+  title     = {{DAIR-V2X}: A Large-Scale Dataset for Vehicle-Infrastructure Cooperative 3{D} Object Detection},
+  booktitle = {CVPR},
+  year      = {2022}
+}
+
+@inproceedings{v2xseq,
+  author    = {Yu, Haibao and Yang, Wenxian and Ruan, Hongzhi and others},
+  title     = {{V2X-Seq}: A Large-Scale Sequential Dataset for Vehicle-Infrastructure Cooperative Perception and Forecasting},
+  booktitle = {CVPR},
+  year      = {2023}
+}
+
+@inproceedings{rope3d,
+  author    = {Ye, Xiaoqing and Shu, Mao and Li, Hanyu and others},
+  title     = {{Rope3D}: The Roadside Perception Dataset for Autonomous Driving and Monocular 3{D} Object Detection Task},
+  booktitle = {CVPR},
+  year      = {2022}
+}
+
+@inproceedings{bevheight,
+  author    = {Yang, Lei and Yu, Kaicheng and Tang, Tao and others},
+  title     = {{BEVHeight}: A Robust Framework for Vision-based Roadside 3{D} Object Detection},
+  booktitle = {CVPR},
+  year      = {2023}
+}
+
+@article{laurentini,
+  author  = {Laurentini, Aldo},
+  title   = {The Visual Hull Concept for Silhouette-Based Image Understanding},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {16},
+  number  = {2},
+  pages   = {150--162},
+  year    = {1994}
+}
+
+@article{spacecarving,
+  author  = {Kutulakos, Kiriakos N. and Seitz, Steven M.},
+  title   = {A Theory of Shape by Space Carving},
+  journal = {International Journal of Computer Vision},
+  volume  = {38},
+  number  = {3},
+  pages   = {199--218},
+  year    = {2000}
+}
+
+@inproceedings{marchingcubes,
+  author    = {Lorensen, William E. and Cline, Harvey E.},
+  title     = {Marching Cubes: A High Resolution 3{D} Surface Construction Algorithm},
+  booktitle = {SIGGRAPH},
+  pages     = {163--169},
+  year      = {1987}
+}
+
+@inproceedings{taubin,
+  author    = {Taubin, Gabriel},
+  title     = {A Signal Processing Approach to Fair Surface Design},
+  booktitle = {SIGGRAPH},
+  pages     = {351--358},
+  year      = {1995}
+}
+
+@inproceedings{shitomasi,
+  author    = {Shi, Jianbo and Tomasi, Carlo},
+  title     = {Good Features to Track},
+  booktitle = {CVPR},
+  pages     = {593--600},
+  year      = {1994}
+}
+
+@article{nister5pt,
+  author  = {Nist{\'e}r, David},
+  title   = {An Efficient Solution to the Five-Point Relative Pose Problem},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {26},
+  number  = {6},
+  pages   = {756--770},
+  year    = {2004}
+}
+
+@article{icp,
+  author  = {Besl, Paul J. and McKay, Neil D.},
+  title   = {A Method for Registration of 3-{D} Shapes},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {14},
+  number  = {2},
+  pages   = {239--256},
+  year    = {1992}
+}
+
+@article{kuhn,
+  author  = {Kuhn, Harold W.},
+  title   = {The {H}ungarian Method for the Assignment Problem},
+  journal = {Naval Research Logistics Quarterly},
+  volume  = {2},
+  pages   = {83--97},
+  year    = {1955}
+}
+
+@inproceedings{bundleadj,
+  author    = {Triggs, Bill and McLauchlan, Philip F. and Hartley, Richard I. and Fitzgibbon, Andrew W.},
+  title     = {Bundle Adjustment -- A Modern Synthesis},
+  booktitle = {Vision Algorithms: Theory and Practice},
+  series    = {LNCS},
+  volume    = {1883},
+  pages     = {298--372},
+  year      = {2000}
+}
+
+@inproceedings{kar2015,
+  author    = {Kar, Abhishek and Tulsiani, Shubham and Carreira, Jo{\~a}o and Malik, Jitendra},
+  title     = {Category-Specific Object Reconstruction from a Single Image},
+  booktitle = {CVPR},
+  year      = {2015}
+}
+
+@inproceedings{deepmanta,
+  author    = {Chabot, Florian and Chaouch, Mohamed and Rabarisoa, Jaonary and Teuli{\`e}re, C{\'e}line and Chateau, Thierry},
+  title     = {Deep {MANTA}: A Coarse-to-Fine Many-Task Network for Joint 2{D} and 3{D} Vehicle Analysis from Monocular Image},
+  booktitle = {CVPR},
+  year      = {2017}
+}
+
+@inproceedings{rcnn3d,
+  author    = {Kundu, Abhijit and Li, Yin and Rehg, James M.},
+  title     = {3{D-RCNN}: Instance-Level 3{D} Object Reconstruction via Render-and-Compare},
+  booktitle = {CVPR},
+  year      = {2018}
+}
+
+@inproceedings{engelmann2016,
+  author    = {Engelmann, Francis and St{\"u}ckler, J{\"o}rg and Leibe, Bastian},
+  title     = {Joint Object Pose Estimation and Shape Reconstruction in Urban Street Scenes Using 3{D} Shape Priors},
+  booktitle = {German Conference on Pattern Recognition (GCPR)},
+  year      = {2016}
+}
+
+@inproceedings{kumar2017,
+  author    = {Kumar, Suryansh and Dai, Yuchao and Li, Hongdong},
+  title     = {Monocular Dense 3{D} Reconstruction of a Complex Dynamic Scene from Two Perspective Frames},
+  booktitle = {ICCV},
+  year      = {2017}
+}
+
+@article{ozden2010,
+  author  = {Ozden, Kemal Egemen and Schindler, Konrad and Van Gool, Luc},
+  title   = {Multibody Structure-from-Motion in Practice},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {32},
+  number  = {6},
+  pages   = {1134--1141},
+  year    = {2010}
+}
+
+@inproceedings{stauffer,
+  author    = {Stauffer, Chris and Grimson, W. Eric L.},
+  title     = {Adaptive Background Mixture Models for Real-Time Tracking},
+  booktitle = {CVPR},
+  year      = {1999}
+}
+
+@article{mallot,
+  author  = {Mallot, Hanspeter A. and B{\"u}lthoff, Heinrich H. and Little, James J. and Bohrer, Stefan},
+  title   = {Inverse Perspective Mapping Simplifies Optical Flow Computation and Obstacle Detection},
+  journal = {Biological Cybernetics},
+  volume  = {64},
+  number  = {3},
+  pages   = {177--185},
+  year    = {1991}
+}
+
+@inproceedings{songchandraker,
+  author    = {Song, Shiyu and Chandraker, Manmohan},
+  title     = {Robust Scale Estimation in Real-Time Monocular {SFM} for Autonomous Driving},
+  booktitle = {CVPR},
+  year      = {2014}
+}
+
+@article{sochor,
+  author  = {Sochor, Jakub and Jur{\'a}nek, Roman and Herout, Adam},
+  title   = {Traffic Surveillance Camera Calibration by 3{D} Model Bounding Box Alignment for Accurate Vehicle Speed Measurement},
+  journal = {Computer Vision and Image Understanding},
+  volume  = {161},
+  pages   = {87--98},
+  year    = {2017}
+}
+
+@article{kanhere,
+  author  = {Kanhere, Neeraj K. and Birchfield, Stanley T.},
+  title   = {Real-Time Incremental Segmentation and Tracking of Vehicles at Low Camera Angles Using Stable Features},
+  journal = {IEEE Transactions on Intelligent Transportation Systems},
+  volume  = {9},
+  number  = {1},
+  pages   = {148--160},
+  year    = {2008}
+}
+
+@article{snakes,
+  author  = {Kass, Michael and Witkin, Andrew and Terzopoulos, Demetri},
+  title   = {Snakes: Active Contour Models},
+  journal = {International Journal of Computer Vision},
+  volume  = {1},
+  number  = {4},
+  pages   = {321--331},
+  year    = {1988}
+}
+
+@article{mitra2006,
+  author  = {Mitra, Niloy J. and Guibas, Leonidas J. and Pauly, Mark},
+  title   = {Partial and Approximate Symmetry Detection for 3{D} Geometry},
+  journal = {ACM Transactions on Graphics},
+  volume  = {25},
+  number  = {3},
+  pages   = {560--568},
+  year    = {2006}
+}

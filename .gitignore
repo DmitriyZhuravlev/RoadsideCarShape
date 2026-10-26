@@ -1,0 +1,12 @@
+# LaTeX build files
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.out
+*.blg
+*.bbl
+*.synctex.gz
+# large, regenerable (scripts/capture_models.py)
+figures/models_A.pkl
+__pycache__/
