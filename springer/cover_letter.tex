@@ -1,0 +1,48 @@
+\documentclass[11pt,a4paper]{letter}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2cm]{geometry}
+\usepackage{lmodern}
+
+\signature{Dmitriy Zhuravlev}
+\address{Dmitriy Zhuravlev\\Taras Shevchenko National University of Kyiv\\Kyiv, Ukraine\\dzhuravlev@ukr.net}
+\date{27 October 2026}
+
+\begin{document}
+\begin{letter}{The Editor-in-Chief\\EURASIP Journal on Image and Video Processing}
+\opening{Dear Editor,}
+
+I am pleased to submit the manuscript ``Learning-Free 3D Car Shapes from a Single Roadside Video'' for consideration
+as a Research Article in the EURASIP Journal on Image and Video Processing.
+
+Monocular 3D perception for roadside cameras is today almost always a learned detector that outputs 3D boxes and
+needs thousands of labelled boxes from the same kind of camera. The manuscript shows that the 3D \emph{shape} of the
+cars passing a fixed, calibrated camera can be recovered without any learning and without labels. In short windows
+of the video each moving car is triangulated, and its planar rigid motion and the depth of every vertex are solved
+jointly; over the whole video the windows of one car are fused in a common car frame, mirrored about its symmetry
+plane, averaged as a robust height field and completed by a visual hull of edge-snapped silhouettes. LiDAR and labels
+are used for evaluation only. On an intersection of V2X-Seq the models reach a solid IoU of 0.61 against the cars'
+accumulated LiDAR, on a par with the labelled 3D boxes themselves (0.58); on a second intersection of DAIR-V2X, not
+used for tuning, they reach 0.49 against 0.55 for the boxes. The evaluation also shows that the raw accumulated LiDAR
+is a strongly biased reference at long range, against which the labelled box scores only 0.38, and the manuscript
+reports a negative result: on a moving vehicle camera the method finds only a small share of the cars.
+
+I believe the work suits the journal because it is image and video processing in the classical sense: multi-view
+geometry, dense optical flow, silhouette extraction and fusion of evidence over a whole video, applied to traffic
+video and measured on public datasets with a reference that is itself examined critically. It offers readers an
+interpretable alternative to learned detectors and a concrete account of where such geometry succeeds and fails.
+
+The manuscript is original, has not been published and is not under consideration for publication elsewhere. My
+earlier papers, cited in the manuscript, recovered 3D \emph{boxes} from single images with inverse perspective mapping
+and segmented moving objects by optical-flow clustering; the present work, its video-level shape reconstruction and
+its LiDAR evaluation are new. I am the sole author and approve the submission. I have no competing interests. An AI
+coding assistant was used to help implement the code and edit the text; this is disclosed in the manuscript, and I
+take full responsibility for its content.
+
+As the corresponding author is based in Ukraine, I would like to request a waiver of the article-processing charge
+under the Springer Nature APC waiver policy.
+
+Thank you for considering the manuscript.
+
+\closing{Yours sincerely,}
+\end{letter}
+\end{document}
