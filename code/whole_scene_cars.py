@@ -76,6 +76,7 @@ SIL_SEARCH = tuple(float(v) for v in os.environ.get("SIL_SEARCH", "1.0,2.0,4.0")
 SIL_SEARCH = (SIL_SEARCH[0], SIL_SEARCH[1], np.radians(SIL_SEARCH[2]))  # search half-widths of the pose refinement
 SIL_SMOOTH = 5                                             # windows: running median of the pose corrections
 SIL_SIDE = float(os.environ.get("SIL_SIDE", "0.7"))        # refine only windows that see the car this side-on
+CAR_COLOUR = os.environ.get("CAR_COLOUR", "best")  # "best": each vertex the original pixel of its best view; "blend": cos^4 average
 PANELS = os.environ.get("PANELS", "whole_scene_video_full_*")
 W_MAX = 2.1                                  # m: widest car (class prior used with the symmetry plane)
 INK, MUTED = "#1f1f1e", "#8a8984"
@@ -552,6 +553,58 @@ def orient_outward(V, F):
 
 
 def pixel_colours(seq, f, sils, V, F, min_cos=0.15, sharp=4.0):
+    if CAR_COLOUR == "best":
+        return best_view_colours(seq, f, sils, V, F, min_cos)
+    return blend_colours(seq, f, sils, V, F, min_cos, sharp)
+
+
+def best_view_colours(seq, f, sils, V, F, min_cos=0.15):
+    """Colour of every vertex = the ORIGINAL PIXEL of the one window that sees it most directly and largest (cos of the
+    angle to the camera over the distance), where it faces the camera, is not hidden behind another part of the car
+    (z-buffer of the model's own vertices) and lies inside the car's silhouette; sampled bilinearly, not averaged, so
+    the video's colours stay as they are. A vertex no window sees takes its mirror image's (the car is symmetric); still
+    unseen: the nearest seen vertex's."""
+    N = mr.vertex_normals(V, F)
+    edge = float(np.median(np.linalg.norm(V[F[:, 0]] - V[F[:, 1]], axis=1)))
+    best = np.full((2, len(V)), -1.0)
+    col = np.zeros((2, len(V), 3))
+    for k, sl in sils.items():
+        if sl is None or k not in f["poses"]:
+            continue
+        m, x0, y0 = sl
+        A, b = f["poses"][k]
+        K, R, t = seq.cams[k]
+        Cc = -np.linalg.solve(R, t)
+        for i, sign in enumerate((1, -1)):
+            Q, Nq = V * [1, sign, 1], N * [1, sign, 1]
+            W = to_world(f, k, Q)
+            Nw = np.c_[Nq[:, :2] @ A, Nq[:, 2]]
+            d = Cc - W
+            dist = np.linalg.norm(d, axis=1)
+            cosang = np.sum(Nw * d, axis=1) / dist
+            q, z = vs.project(seq.cams[k], W)
+            r = int(np.ceil(edge * K[0, 0] / np.median(z[z > 0]) / 2)) + 1 if (z > 0).any() else 1
+            ok = (cosang > min_cos) & vs.visible(q, z, seq.shape, r, 1.5 * edge)
+            mu, mv = np.round(q[:, 0]).astype(int) - x0, np.round(q[:, 1]).astype(int) - y0
+            ok &= (mu >= 0) & (mv >= 0) & (mu < m.shape[1]) & (mv < m.shape[0])
+            ok[ok] = m[mv[ok], mu[ok]] > 0
+            score = cosang / dist
+            upd = ok & (score > best[i])
+            if upd.any():
+                col[i, upd] = vs.bilinear(seq.frames[k], q[upd])
+                best[i, upd] = score[upd]
+    own = best[0] >= 0
+    out = np.where(own[:, None], col[0], col[1])
+    seen = own | (best[1] >= 0)
+    if not seen.any():
+        return np.full((len(V), 3), 150.0)
+    if not seen.all():
+        from scipy.spatial import cKDTree
+        out[~seen] = out[seen][cKDTree(V[seen]).query(V[~seen])[1]]
+    return out
+
+
+def blend_colours(seq, f, sils, V, F, min_cos=0.15, sharp=4.0):
     """Colour of every vertex = the VIDEO PIXELS of every window that sees it, weighted by cos^sharp of the angle
     between its normal and the direction to the camera (head-on views dominate, single-pixel noise cancels); a
     vertex no window sees takes its mirror image's colour (the car is symmetric); still unseen: grey."""
@@ -711,7 +764,9 @@ def side_view_type(seq, f, n_views=3):
         used.append(k)
     if not votes:
         return "unknown", {}, []
-    best = max(set(votes), key=votes.count)
+    # majority; a tie goes to the most side-on view (votes are in that order). Not max(set(votes)): the iteration
+    # order of a set of strings changes from run to run (hash randomisation), so ties were decided at random
+    best = max(votes, key=votes.count)
     return best, feats[votes.index(best)], used
 
 

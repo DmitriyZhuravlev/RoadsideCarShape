@@ -69,6 +69,34 @@ def project(cam, X):
     return (x[:2] / x[2]).T, x[2]
 
 
+def visible(uv, z, shape, radius, tol):
+    """Points not hidden by others: a z-buffer of the points splatted (2 radius + 1)^2 px; a point is visible when it
+    is in front, inside the image and within tol of the nearest depth at its pixel."""
+    H, W = shape
+    u, v = np.round(uv).astype(int).T
+    ok = (z > 0) & (u >= 0) & (v >= 0) & (u < W) & (v < H)
+    buf = np.full(H * W, np.inf)
+    for du in range(-radius, radius + 1):
+        for dv in range(-radius, radius + 1):
+            uu, vv = u + du, v + dv
+            m = ok & (uu >= 0) & (vv >= 0) & (uu < W) & (vv < H)
+            np.minimum.at(buf, vv[m] * W + uu[m], z[m])
+    out = np.zeros(len(z), bool)
+    out[ok] = z[ok] <= buf[v[ok] * W + u[ok]] + tol
+    return out
+
+
+def bilinear(img, q):
+    """The image (H, W, 3) sampled bilinearly at the pixel coordinates q (N, 2) = (u, v), pixel centres at integers."""
+    im = img.astype(np.float32)
+    x0, y0 = np.floor(q[:, 0]).astype(int), np.floor(q[:, 1]).astype(int)
+    fx, fy = (q[:, 0] - x0)[:, None], (q[:, 1] - y0)[:, None]
+    x1, y1 = np.clip(x0 + 1, 0, img.shape[1] - 1), np.clip(y0 + 1, 0, img.shape[0] - 1)
+    x0, y0 = np.clip(x0, 0, img.shape[1] - 1), np.clip(y0, 0, img.shape[0] - 1)
+    return ((1 - fx) * (1 - fy) * im[y0, x0] + fx * (1 - fy) * im[y0, x1]
+            + (1 - fx) * fy * im[y1, x0] + fx * fy * im[y1, x1])
+
+
 def carve_votes(axes, views, symmetric=True):
     """Share of the views (that see the voxel) whose silhouette contains it; views = (cam, centre, yaw, mask)."""
     X, Y, Z = np.meshgrid(*axes, indexing="ij")
