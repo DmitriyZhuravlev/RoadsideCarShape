@@ -846,6 +846,15 @@ def resample(Hm, xs, ys, xq, yq):
     return np.where(ok, Hm[np.clip(ix, 0, len(xs) - 1), np.clip(iy, 0, len(ys) - 1)], 0.0)
 
 
+def common_grid(xa, ya, xb, yb, step):
+    """A uniform grid (spacing step, symmetric about 0) covering two centred grids, e.g. a model's and a LiDAR
+    reference's: the LiDAR grid spans only the labelled box, so a model longer than the label must be scored on a grid
+    that covers it too, else its excess is ignored and the IoU inflated."""
+    n = int(np.ceil(max(abs(xa).max(), abs(xb).max()) / step)) + 1
+    m = int(np.ceil(max(abs(ya).max(), abs(yb).max()) / step)) + 1
+    return (np.arange(-n, n) + 0.5) * step, (np.arange(-m, m) + 0.5) * step
+
+
 def shape_scores(Hm, xs, ys, Lt, lx, ly):
     """After centring both footprints and trying both headings: solid IoU and mean |height difference|."""
     def centred(H, x, y):
@@ -856,15 +865,19 @@ def shape_scores(Hm, xs, ys, Lt, lx, ly):
         return x - (x[ix.min()] + x[ix.max()]) / 2, y - (y[iy.min()] + y[iy.max()]) / 2
     xs2, ys2 = centred(Hm, xs, ys)
     lx2, ly2 = centred(Lt, lx, ly)
+    # both on one grid that covers both: the LiDAR grid spans only the labelled box (+0.1 m), so sampling the model on
+    # it alone ignored whatever of the model lies outside the box and inflated the IoU of models longer than the car
+    gx, gy = common_grid(xs2, ys2, lx2, ly2, lx[1] - lx[0])
+    L = resample(Lt, lx2, ly2, gx, gy)
     best = None
     for flip in (1, -1):
-        H = resample(Hm, flip * xs2[::flip], ys2, lx2, ly2) if flip == 1 else resample(Hm[::-1], -xs2[::-1], ys2, lx2, ly2)
-        a, b = H > GROUND_H, Lt > GROUND_H
-        inter = np.minimum(np.where(a, H, 0), np.where(b, Lt, 0)).sum()
-        union = np.maximum(np.where(a, H, 0), np.where(b, Lt, 0)).sum()
+        H = resample(Hm, xs2, ys2, gx, gy) if flip == 1 else resample(Hm[::-1], -xs2[::-1], ys2, gx, gy)
+        a, b = H > GROUND_H, L > GROUND_H
+        inter = np.minimum(np.where(a, H, 0), np.where(b, L, 0)).sum()
+        union = np.maximum(np.where(a, H, 0), np.where(b, L, 0)).sum()
         both = a & b
         s = {"iou": float(inter / max(union, 1e-9)),
-             "height_err_cm": float(100 * np.median(np.abs(H[both] - Lt[both]))) if both.any() else float("nan"),
+             "height_err_cm": float(100 * np.median(np.abs(H[both] - L[both]))) if both.any() else float("nan"),
              "footprint_iou": float((a & b).sum() / max((a | b).sum(), 1))}
         s["flip"] = flip
         if best is None or s["iou"] > best["iou"]:
@@ -898,6 +911,8 @@ def fuse_track(track):
         if SYMMETRY:                         # a car is symmetric about its centre plane and at most W_MAX wide
             keep = np.abs(p[0][:, 1]) <= W_MAX / 2
             p[0], p[1] = p[0][keep], p[1][keep]
+    if all(len(p[0]) == 0 for p in parts):   # nothing left within the width: no model for this track
+        return None
     Hm, Cm, xs, ys, views = height_field(parts, mirror=SYMMETRY, min_views=max(MIN_VIEWS, int(VOTE * len(parts))),
                                          w=np.array([1.0 / (0.5 + t[1]["reprojection_px"]) for t in track])
                                          if W_MEDIAN else None)
@@ -936,6 +951,8 @@ def main():
     rows, models = [], {}
     for n, tr in enumerate(tracks):
         f = fuse_track(tr)
+        if f is None:                          # skipped; the other tracks keep their numbers
+            continue
         if CABIN:
             sils = {k: full_silhouette(seq, k, d) for k, d in tr}
             near = float(np.median([d["range"] for _, d in tr])) < RANGE_HULL

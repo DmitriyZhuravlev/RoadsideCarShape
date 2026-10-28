@@ -36,7 +36,7 @@ import v2x_seq_classical as vc
 import v2x_seq_demo as vd
 import v2x_seq_shape as vs
 
-OUT = os.path.join(vd.OUT_DIR, "vru")
+OUT = os.environ.get("VRU_OUT", os.path.join(vd.OUT_DIR, "vru"))   # one folder per sequence: track ids repeat
 VOTE = float(os.environ.get("VOTE", "0.75"))      # share of the carving frames whose silhouette must hold a voxel
 TRACK = os.environ.get("TRACK", "own")             # "label": the labelled 2D boxes as the tracker (given tracking)
 VOX_PX = float(os.environ.get("VOX_PX", "1.5"))   # voxel size in pixels at the object's range (2 - 6 cm)
@@ -44,6 +44,8 @@ VOX = 0.04                                          # m, set per object
 BG_STEP = 4                                         # every 4th frame for the median background
 MAX_SKIP = 15                                       # frames in a row without a silhouette (a car in front) before the track ends
 REFINE = int(os.environ.get("REFINE", "0"))         # rounds of aligning the frames to the model (off: it drifts across the ray)
+BLURS = (0.7, None)        # reflection test variants per object (blurred mirror image required / mirror line only);
+BLUR = 0.7                 # the one in use: the variant whose model explains the held-out frames best is kept
 W_MAX = float(os.environ.get("W_MAX", "0.6"))     # m: width prior (the depth along a side view is barely observed)
 ELLIPSE = os.environ.get("ELLIPSE", "1") == "1"    # elliptic horizontal sections (thin at the ends, round, not a slab)
 
@@ -127,12 +129,14 @@ def shadow(img, bg, low=0.3):
     return sh
 
 
-def mirror_row(gray, dist, mask, x0, y0, min_score=0.45, faint=0.75):
+def mirror_row(gray, dist, mask, x0, y0, min_score=0.45, faint=0.75, blur="auto"):
     """The ground contact row of a silhouette that includes its reflection on a wet road: the first row from the top
     (in its lower half) about which the image is mirror-symmetric (normalised correlation of the rows above with the
     flipped rows below, in the silhouette's columns) AND below which the silhouette is faint (mean colour distance to
-    the background at most `faint` of that above): a wheel or a scooter is mirror-symmetric about its own axle too, but
-    as strong below it as above. None when no row qualifies (a dry road)."""
+    the background at most `faint` of that above) and blurred (mean gradient at most `blur` of that above): a wheel, a
+    scooter or a person's legs are mirror-symmetric too, but as strong and as sharp below the line as above it.
+    None when no row qualifies (a dry road)."""
+    blur = BLUR if blur == "auto" else blur
     ys, xs = np.nonzero(mask)
     top, bot = ys.min(), ys.max()
     h = bot - top + 1
@@ -141,6 +145,10 @@ def mirror_row(gray, dist, mask, x0, y0, min_score=0.45, faint=0.75):
     G = gray[y0:y0 + mask.shape[0], x0:x0 + mask.shape[1]].astype(float)[:, cols]
     Dm = (dist * mask)[:, cols]
     M = mask[:, cols]
+    if min(G.shape) < 2:                   # a sliver: no line to test
+        return None
+    gy, gx = np.gradient(G)
+    Gm = np.hypot(gx, gy)                  # sharpness: a reflection is blurred, the object above it is not
     for r in range(top + h // 2, bot - 2):
         if r - D - 1 < 0 or r + D + 1 > len(G) or M[r:r + D].sum() < 3:
             continue
@@ -153,7 +161,9 @@ def mirror_row(gray, dist, mask, x0, y0, min_score=0.45, faint=0.75):
             continue
         above = Dm[r - D:r].sum() / max(M[r - D:r].sum(), 1)
         below = Dm[r:r + D].sum() / max(M[r:r + D].sum(), 1)
-        if faint is None or below <= faint * above:
+        sharp_above = (Gm[r - D:r] * M[r - D:r]).sum() / max(M[r - D:r].sum(), 1)
+        sharp_below = (Gm[r:r + D] * M[r:r + D]).sum() / max(M[r:r + D].sum(), 1)
+        if (faint is None or below <= faint * above) and (blur is None or sharp_below <= blur * sharp_above):
             return r
     return None
 
@@ -499,16 +509,19 @@ def figure(path_png, fids, cams, sils, poses, V, F, C, row, occ):
 
 
 # --- main ---------------------------------------------------------------------------------------------------------
-def run(tid, fids, cams, labels, camera_xy):
+def reconstruct(tid, fids, cams, labels, camera_xy):
+    """The model of one object with the current reflection test (BLUR): dict(row, occ, V, F, C, sils, poses, ks, raw)
+    or None."""
     global VOX
     lab = labels[tid]
-    # the seed: the largest labelled box where the object stands free (no car in front); selection only
+    # the seed: the largest labelled box where the object stands free and its silhouette fills the box; selection only
     box = lambda k: [float(lab[k]["2d_box"][a]) for a in ("xmin", "ymin", "xmax", "ymax")]
     seed, box0 = None, None
     for k in sorted(lab, key=lambda k: -(lab[k]["2d_box"]["ymax"] - lab[k]["2d_box"]["ymin"]))[:40]:
         img = frame(fids, k)
         r = silhouette(img, background(fids, k), box(k)) if img is not None else None
-        if r is not None and lab[k].get("truncated_state", 0) == 0:
+        # a clean start: the silhouette fills the labelled box (no reflection, no neighbour merged)
+        if r is not None and lab[k].get("truncated_state", 0) == 0 and box_iou(r[1], box(k)) >= 0.7:
             seed, box0 = k, list(r[1])
             break
     if seed is None:
@@ -562,12 +575,31 @@ def run(tid, fids, cams, labels, camera_xy):
            "path along-ray err m": float(np.median(np.abs((err * rays).sum(1)))),
            "path across-ray err m": float(np.median(np.abs(err[:, 0] * -rays[:, 1] + err[:, 1] * rays[:, 0]))),
            "holdout_iou": holdout_iou(cams, sils, poses, occ, check_ks), "voxels": int(occ.sum()), "vox_m": VOX}
-    os.makedirs(OUT, exist_ok=True)
     row["tracking"] = TRACK
+    row["reflection_test"] = "mirror line, blurred below" if BLUR is not None else "mirror line"
+    return dict(row=row, occ=occ, V=V, F=F, C=C, sils=sils, poses=poses, ks=ks, raw=raw)
+
+
+def run(tid, fids, cams, labels, camera_xy):
+    """Both reflection tests (a wet road mirrors sharply, a dry one not at all, legs are symmetric too): the model whose
+    silhouettes match the held-out frames best is kept - a choice without labels. Writes <tid>.json/.npz/.png."""
+    global BLUR, VOX
+    best, vox = None, VOX
+    for BLUR in BLURS:
+        res = reconstruct(tid, fids, cams, labels, camera_xy)
+        fit = lambda r: -1.0 if not np.isfinite(r["row"]["holdout_iou"]) else r["row"]["holdout_iou"]   # NaN: no check frames
+        if res is not None and (best is None or fit(res) > fit(best)):
+            best, vox = res, VOX
+    if best is None:
+        return None
+    VOX = vox
+    row, ks, poses = best["row"], best["ks"], best["poses"]
+    os.makedirs(OUT, exist_ok=True)
     json.dump(row, open(os.path.join(OUT, f"{tid}.json"), "w"), indent=1)
-    np.savez_compressed(os.path.join(OUT, f"{tid}.npz"), occ=occ, V=V, F=F, C=C, ks=ks,
-                        poses=np.array([[*poses[k][0], poses[k][1]] for k in ks]), raw_path=raw)
-    figure(os.path.join(OUT, f"{tid}.png"), fids, cams, sils, poses, V, F, C, row, occ)
+    np.savez_compressed(os.path.join(OUT, f"{tid}.npz"), occ=best["occ"], V=best["V"], F=best["F"], C=best["C"],
+                        ks=ks, poses=np.array([[*poses[k][0], poses[k][1]] for k in ks]), raw_path=best["raw"])
+    figure(os.path.join(OUT, f"{tid}.png"), fids, cams, best["sils"], poses, best["V"], best["F"], best["C"], row,
+           best["occ"])
     return row
 
 

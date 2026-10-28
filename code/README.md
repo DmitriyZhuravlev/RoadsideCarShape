@@ -1,6 +1,6 @@
 # Code of the article
 
-A snapshot of the parts of the research repository `3dseg` (commit `da5608c`) that the article uses: the reconstruction
+A snapshot of the parts of the research repository `3dseg` (commit `dec7965`) that the article uses: the reconstruction
 pipeline, its evaluation, the moving-camera variant and the dataset converter. Everything is classical (no learned
 models); LiDAR and labels are read for evaluation only.
 

@@ -97,7 +97,8 @@ Not applicable.
 
 def main():
     src = open(os.path.join(HERE, "main.tex"), encoding="utf-8").read()
-    numbers = open(os.path.join(HERE, "tables", "numbers.tex"), encoding="utf-8").read()
+    numbers = "".join(open(os.path.join(HERE, "tables", f), encoding="utf-8").read()
+                      for f in ("numbers.tex", "numbers_large.tex") if os.path.exists(os.path.join(HERE, "tables", f)))
     abstract = between(src, r"\begin{abstract}", r"\keywords{").strip()
     keywords = between(src, r"\keywords{", r"\end{abstract}").strip().rstrip("}")
     keywords = re.sub(r"\s+", " ", re.sub(r"\s*\\and\s*", ", ", keywords))

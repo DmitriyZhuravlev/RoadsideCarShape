@@ -14,8 +14,7 @@ import sys
 
 import numpy as np
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SPD = "/home/dzhura/Documents/MyArticles/dataset/dair_c_spd"
+from run_subset import HERE, SPD, TAG   # noqa: E402  (RUNS, SPD, TAG from the environment, DAIR-V2X-C by default)
 CODE = os.path.expanduser("~/Documents/MyArticles/code/3dseg")
 SCRIPTS = os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/scripts")
 JOBS = 3
@@ -97,7 +96,7 @@ def models():
     """(row, V, F, BGR 0-255 colours, LiDAR points) of every evaluated car with a mesh, best closed IoU first."""
     out = []
     for r in load_rows():
-        path = os.path.join(CODE, "docs", f"cars_viewer_dairc_{r['clip']}", "meshes.json")
+        path = os.path.join(CODE, "docs", f"cars_viewer_{TAG}_{r['clip']}", "meshes.json")
         if "fused closed: iou" not in r or not os.path.exists(path):
             continue
         m = json.load(open(path)).get(f"track {r['track']}")

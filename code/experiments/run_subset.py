@@ -1,6 +1,7 @@
 """DAIR-V2X-C infrastructure clips through the 3dseg pipeline (single pass, default ride height).
 
-    python run_subset.py [N_CLIPS] [JOBS]      default 20 clips, 3 clips at a time
+    python run_subset.py [N_CLIPS] [JOBS] [PER_SITE]     default 20 clips, 3 at a time, at most 3 per intersection
+    SPD=<folder with clips.json> RUNS=<results folder> TAG=<name> ...     another dataset (default DAIR-V2X-C)
 
 Clips: the longest (frames with an image) of every intersection, round-robin over the intersections, at most 3 per
 intersection. Per clip: windows at every second frame that has an image (WIN frames in from both ends), then the car
@@ -13,9 +14,10 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-SPD = "/home/dzhura/Documents/MyArticles/dataset/dair_c_spd"
+SPD = os.environ.get("SPD", "/home/dzhura/Documents/MyArticles/dataset/dair_c_spd")     # clips (clips.json)
 CODE = os.path.expanduser("~/Documents/MyArticles/code/3dseg")
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.environ.get("RUNS", os.path.dirname(os.path.abspath(__file__)))                # results per clip
+TAG = os.environ.get("TAG", "dairc")                                                      # names of dumps/outputs
 WIN = 8
 
 
@@ -57,20 +59,20 @@ def run_clip(c):
     cars = os.path.join(work, "cars.json")
     if os.path.exists(cars):
         return name, "done before"
-    dumps = os.path.join("docs", "dairc_objects", name)          # relative to the 3dseg folder (vd.OUT_DIR = docs)
+    dumps = os.path.join("docs", f"{TAG}_objects", name)          # relative to the 3dseg folder (vd.OUT_DIR = docs)
     ks = windows(data)
     env = dict(os.environ, V2X_SEQ_DIR=data, SEG="mask", MIRROR="0", TYRES="0", FIGURES="0", DUMP="1",
-               DUMP_DIR=os.path.join("dairc_objects", name), SUFFIX=f"_dairc_{name}")
+               DUMP_DIR=os.path.join(f"{TAG}_objects", name), SUFFIX=f"_{TAG}_{name}")
     have = len(os.listdir(os.path.join(CODE, dumps))) if os.path.isdir(os.path.join(CODE, dumps)) else 0
     if have < len(ks):
         todo = [k for k in ks if not os.path.exists(os.path.join(CODE, dumps, f"{k:04d}.pkl"))]
         with open(os.path.join(work, "windows.log"), "a") as log:
             subprocess.run(["python", "whole_scene.py", *map(str, todo)], cwd=CODE, env=env, stdout=log,
                            stderr=subprocess.STDOUT)
-    env = dict(os.environ, V2X_SEQ_DIR=data, DUMPS=dumps, VIDEO="0", OUT_SUFFIX=f"_dairc_{name}")
+    env = dict(os.environ, V2X_SEQ_DIR=data, DUMPS=dumps, VIDEO="0", OUT_SUFFIX=f"_{TAG}_{name}")
     with open(os.path.join(work, "cars.log"), "w") as log:
         r = subprocess.run(["python", "whole_scene_cars.py"], cwd=CODE, env=env, stdout=log, stderr=subprocess.STDOUT)
-    src = os.path.join(CODE, "docs", f"whole_scene_cars_dairc_{name}.json")
+    src = os.path.join(CODE, "docs", f"whole_scene_cars_{TAG}_{name}.json")
     if r.returncode == 0 and os.path.exists(src):
         os.replace(src, cars)
         return name, f"{len(ks)} windows, cars done"
@@ -80,7 +82,9 @@ def run_clip(c):
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 20
     jobs = int(sys.argv[2]) if len(sys.argv) > 2 else 3
-    chosen = pick_clips(json.load(open(os.path.join(SPD, "clips.json"))), total=n)
+    per_site = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+    chosen = pick_clips(json.load(open(os.path.join(SPD, "clips.json"))), per_site=per_site, total=n)
+    os.makedirs(HERE, exist_ok=True)
     json.dump(chosen, open(os.path.join(HERE, "chosen.json"), "w"), indent=1)
     print(len(chosen), "clips,", sum(c["with_image"] for c in chosen), "frames with an image:",
           ", ".join(f"{c['clip']} ({c['intersection']})" for c in chosen), flush=True)

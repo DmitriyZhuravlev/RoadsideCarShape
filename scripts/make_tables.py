@@ -12,10 +12,10 @@ import numpy as np
 DOCS = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tables")
 
-# boxes scored like the models (3dseg oracle run on the same cars): labelled box / box of our own L, W, H
-# (on the cars of the method's version, v7: 20 cars on A, 7 on B)
-BOXES = {"A": {"label": (0.384, 0.581, 0.691), "own": (0.353, 0.569)},
-         "B": {"label": (0.380, 0.550, 0.693), "own": (0.327, 0.485)}}
+# boxes scored like the models (scripts/box_scores.py on the cars of A5 / B5): labelled box / box of our own L, W, H;
+# IoU raw, IoU closed, footprint IoU closed - on a grid covering box and LiDAR (see whole_scene_cars.shape_scores)
+BOXES = {"A": {"label": (0.378, 0.572, 0.680), "own": (0.331, 0.532)},
+         "B": {"label": (0.378, 0.546, 0.688), "own": (0.236, 0.349)}}
 OURS = {"A": "A5", "B": "B5"}                     # v7: denser body triangulation
 # moving camera (V2X-Seq vehicle side, 58 windows): visual odometry and detection against the labels
 EGO = {"Egopath": "13\\,\\%", "Egolabels": 187, "Egofound": 25, "Egorecall": "0.13", "Egoprecision": "0.53"}
@@ -125,5 +125,49 @@ def main():
     print("ours A", {a: round(b, 3) for a, b in A.items()}); print("ours B", {a: round(b, 3) for a, b in B.items()})
 
 
+# --- the larger evaluation: DAIR-V2X-C clips and V2X-Seq-SPD sequences (dataset/*_runs/pool.py -> pooled.json) ---
+RUNS = os.path.expanduser("~/Documents/MyArticles/dataset")
+LARGE = [("DAIR-V2X-C", "dair_c_runs", "Dair"), ("V2X-Seq-SPD", "spd_runs", "Spd")]
+
+
+def large_eval():
+    """tables/large_eval.tex (per intersection and in total: our models and the labelled boxes against the raw and the
+    gap-closed LiDAR, position errors) and tables/numbers_large.tex (macros) from the pooled results that exist."""
+    have = [(name, json.load(open(os.path.join(RUNS, d, "pooled.json"))), json.load(open(os.path.join(RUNS, d, "chosen.json"))), m)
+            for name, d, m in LARGE if os.path.exists(os.path.join(RUNS, d, "pooled.json"))]
+    if not have:
+        return
+    lines = [r"\begin{table}[!htb]", r"\centering",
+             r"\caption{Larger evaluation, no parameter changed: clips of DAIR-V2X-C and sequences of V2X-Seq-SPD,"
+             r" two or three per intersection. Mean solid IoU of our models and of the labelled boxes against the"
+             r" cars' raw and gap-closed accumulated LiDAR; median position error of our models along and across the"
+             r" viewing ray.}",
+             r"\label{tab:large}", r"\footnotesize", r"\begin{tabular}{llrcccccc}", r"\toprule",
+             r"Dataset & Intersection & Cars & \multicolumn{2}{c}{raw LiDAR} & \multicolumn{2}{c}{closed LiDAR} &"
+             r" \multicolumn{2}{c}{position (m)} \\",
+             r"\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}",
+             r" & & & ours & box & ours & box & along & across \\", r"\midrule"]
+    fmt = lambda s: [str(s["cars"]), f"{s['ours raw']:.3f}", f"{s['box raw']:.3f}", f"{s['ours closed']:.3f}",
+                     f"{s['box closed']:.3f}", f"{s['along m']:.2f}", f"{s['across m']:.2f}"]
+    macros = {}
+    for i, (name, pooled, chosen, m) in enumerate(have):
+        sites = sorted(k for k in pooled if k != "all")
+        for j, site in enumerate(sites):
+            lines.append(" & ".join([name if j == 0 else "", site.replace("yizhuang", "yz")] + fmt(pooled[site])) + r" \\")
+        lines.append(" & ".join(["", r"\textbf{all}"] + [rf"\textbf{{{v}}}" for v in fmt(pooled["all"])]) + r" \\")
+        lines.append(r"\midrule" if i < len(have) - 1 else r"\bottomrule")
+        a = pooled["all"]
+        macros.update({f"{m}Cars": a["cars"], f"{m}Clips": len(chosen), f"{m}Sites": len(sites),
+                       f"{m}Frames": sum(c["with_image"] for c in chosen),
+                       f"{m}OursRaw": f"{a['ours raw']:.3f}", f"{m}BoxRaw": f"{a['box raw']:.3f}",
+                       f"{m}OursClosed": f"{a['ours closed']:.3f}", f"{m}BoxClosed": f"{a['box closed']:.3f}",
+                       f"{m}Along": f"{a['along m']:.2f}", f"{m}Across": f"{a['across m']:.2f}"})
+    lines += [r"\end{tabular}", r"\end{table}"]
+    open(os.path.join(OUT, "large_eval.tex"), "w").write("\n".join(lines) + "\n")
+    write_macros(os.path.join(OUT, "numbers_large.tex"), macros)
+    print("large evaluation:", {k: v for k, v in macros.items() if "Closed" in k or "Cars" in k})
+
+
 if __name__ == "__main__":
     main()
+    large_eval()

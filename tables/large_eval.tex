@@ -1,0 +1,30 @@
+\begin{table}[!htb]
+\centering
+\caption{Larger evaluation, no parameter changed: clips of DAIR-V2X-C and sequences of V2X-Seq-SPD, two or three per intersection. Mean solid IoU of our models and of the labelled boxes against the cars' raw and gap-closed accumulated LiDAR; median position error of our models along and across the viewing ray.}
+\label{tab:large}
+\footnotesize
+\begin{tabular}{llrcccccc}
+\toprule
+Dataset & Intersection & Cars & \multicolumn{2}{c}{raw LiDAR} & \multicolumn{2}{c}{closed LiDAR} & \multicolumn{2}{c}{position (m)} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+ & & & ours & box & ours & box & along & across \\
+\midrule
+DAIR-V2X-C & yz02 & 20 & 0.448 & 0.452 & 0.591 & 0.631 & 1.63 & 0.76 \\
+ & yz06 & 40 & 0.461 & 0.518 & 0.563 & 0.645 & 1.83 & 0.58 \\
+ & yz08 & 5 & 0.311 & 0.499 & 0.413 & 0.635 & 0.98 & 0.31 \\
+ & yz09 & 27 & 0.445 & 0.457 & 0.587 & 0.617 & 1.08 & 0.74 \\
+ & yz10 & 9 & 0.423 & 0.429 & 0.535 & 0.621 & 1.88 & 0.65 \\
+ & yz13 & 7 & 0.459 & 0.554 & 0.510 & 0.662 & 1.86 & 0.44 \\
+ & yz16 & 22 & 0.317 & 0.368 & 0.425 & 0.546 & 0.97 & 0.43 \\
+ & \textbf{all} & \textbf{130} & \textbf{0.423} & \textbf{0.465} & \textbf{0.539} & \textbf{0.619} & \textbf{1.47} & \textbf{0.58} \\
+\midrule
+V2X-Seq-SPD & yz06 & 60 & 0.512 & 0.599 & 0.607 & 0.692 & 1.83 & 0.40 \\
+ & yz08 & 13 & 0.283 & 0.393 & 0.399 & 0.572 & 1.83 & 0.31 \\
+ & yz09 & 19 & 0.370 & 0.453 & 0.507 & 0.622 & 1.06 & 0.37 \\
+ & yz10 & 8 & 0.261 & 0.375 & 0.372 & 0.595 & 2.12 & 0.19 \\
+ & yz13 & 14 & 0.412 & 0.516 & 0.479 & 0.593 & 2.08 & 0.27 \\
+ & yz16 & 14 & 0.296 & 0.339 & 0.445 & 0.533 & 1.17 & 0.36 \\
+ & \textbf{all} & \textbf{128} & \textbf{0.417} & \textbf{0.505} & \textbf{0.525} & \textbf{0.635} & \textbf{1.72} & \textbf{0.35} \\
+\bottomrule
+\end{tabular}
+\end{table}
