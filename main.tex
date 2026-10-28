@@ -36,9 +36,10 @@ that the 3D \emph{shape} of the cars that pass a fixed, calibrated camera can be
 without labels. In short windows of the video every moving car is triangulated and its planar rigid motion and the
 depth of every vertex are solved jointly; across the whole video the windows of one car are brought into a common car
 frame, mirrored about the car's symmetry plane, averaged as a robust height field and completed by a visual hull of
-edge-snapped silhouettes. LiDAR and labels are used for evaluation only. On intersection~A of V2X-Seq the models
-reach a solid IoU of \AsixClosed{} against the cars' accumulated LiDAR, as high as the labelled boxes themselves
-(\AlabClosed{}); on a second intersection of DAIR-V2X that was not used for tuning they reach \BsixClosed{} against
+edge-snapped silhouettes. LiDAR and labels are used for evaluation only. On intersection~A of V2X-Seq --- the intersection the method was
+tuned on --- the models reach a solid IoU of \AsixClosed{} against the cars' accumulated LiDAR, as high as the
+labelled boxes themselves (\AlabClosed{}); on a second intersection of DAIR-V2X that was not used for tuning they
+reach \BsixClosed{} against
 \BlabClosed{} for the labelled boxes, and cars seen only from behind remain the main failure. Unchanged, the method
 reaches \DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD
 (labelled boxes \DairBoxClosed{} and \SpdBoxClosed{}), the main error being the cars' length along the viewing ray;
@@ -296,13 +297,23 @@ compares the occupied columns; the \emph{height error} is the median $|H - L|$ o
 
 \input{tables/main_table.tex}
 
-\paragraph{Intersection A.} Table~\ref{tab:main} compares the models with three references scored in the same way:
-the labelled box, a box of our own estimated length, width and height, and the best single window without averaging
-and symmetry. Against the closed reference our models reach \AsixClosed{}, as high as the labelled boxes
-(\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the shape adds to the dimensions. A single
-window reaches only \AsingleClosed{}; the gain comes from fusing the video (Fig.~\ref{fig:steps}).
+\paragraph{Intersection A (tuning set).} Table~\ref{tab:main} compares the models with three references scored in
+the same way: the labelled box, a box of our own estimated length, width and height, and the best single window
+without averaging and symmetry. A is the intersection the method was tuned on, so its comparison with the labelled
+box is in-sample; B and the larger evaluation below are not. Against the closed reference our models reach
+\AsixClosed{}, as high as the labelled boxes (\AlabClosed{}) and above a box of the same size as ours
+(\AboxClosed{}): the shape adds to the dimensions. A single window reaches only \AsingleClosed{}; the gain comes
+from fusing the video (Fig.~\ref{fig:steps}).
 Figure~\ref{fig:scene} draws the models back into one frame of the video, Fig.~\ref{fig:cars} shows the best cars
 up close with their LiDAR, and Fig.~\ref{fig:gallery} their height fields.
+
+\input{tables/paired_ci.tex}
+
+\paragraph{Paired comparison.} Table~\ref{tab:paired} pairs every car with its labelled box and bootstraps the
+mean difference: on the tuning intersection~A the difference is not separated from zero, on B and the two larger
+evaluations it is, with the intervals of the table. About a third of the occupied cells of the gap-closed reference
+were added by the closing itself (mean filled share 0.37 on A), and on the cells the scanner actually returned our
+models score substantially higher (mean scanned IoU 0.75 against 0.60 overall on A).
 
 \paragraph{Position.} The shapes are right in the car's own frame, but the car is placed with the error of a single
 camera: its centre is off by a median of \Aalong{}~m along the viewing ray and \Aacross{}~m across it. Centred on the

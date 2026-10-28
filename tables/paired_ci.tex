@@ -1,0 +1,23 @@
+\begin{table}[t]
+\centering
+\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}: the car's length was seen side-on ($\ge 2$ side-on windows, \texttt{n\_side} $\ge 2$); \emph{prior}: capped by the 4.6\,m length prior; \emph{n/a}: older runs without the split. Intersection A is the tuning set of the method.}
+\label{tab:paired}
+\small
+\begin{tabular}{llrcl}
+\toprule
+Dataset & length & cars & mean $\Delta$ IoU & 95\,\% CI \\
+\midrule
+intersection A (tuning) & all & 17 & +0.005 & [-0.032, +0.038] \\
+ & n/a & 17 & +0.005 & [-0.032, +0.038] \\
+\midrule
+intersection B & all & 7 & -0.160 & [-0.230, -0.080] \\
+ & n/a & 7 & -0.160 & [-0.230, -0.080] \\
+\midrule
+DAIR-V2X-C & all & 130 & -0.081 & [-0.103, -0.059] \\
+ & n/a & 130 & -0.081 & [-0.103, -0.059] \\
+\midrule
+V2X-Seq-SPD & all & 128 & -0.110 & [-0.131, -0.090] \\
+ & n/a & 128 & -0.110 & [-0.131, -0.090] \\
+\bottomrule
+\end{tabular}
+\end{table}
