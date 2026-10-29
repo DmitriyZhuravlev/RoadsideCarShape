@@ -95,6 +95,7 @@ EXPORT = os.environ.get("EXPORT", "0") == "1"
 VIDEO = os.environ.get("VIDEO", "0") == "1"
 DUMP = os.environ.get("DUMP", "0") == "1"
 DUMP_DIR = os.environ.get("DUMP_DIR", "whole_scene_objects")
+OBJ_LOG = os.environ.get("OBJ_LOG", "0") == "1"   # (diagnostics) one line per candidate object and what became of it
 VIEW_SCALE = 0.5                                  # novel views at half resolution
 VIEW_RANGE = 95.0                                 # m: scene shown in the novel views
 INK, MUTED = "#1f1f1e", "#8a8984"
@@ -618,6 +619,19 @@ def move(X, m, c):
     return np.c_[xy, X[:, 2]]
 
 
+def log_object(k, P, tri, idx, outcome, extra=None):
+    """(diagnostics, OBJ_LOG=1) One line per candidate object of window k: where it is in the image and what became of
+    it. P (n, 2) pixel positions of the window's vertices, tri (m, 3) triangles, idx the object's triangle indices."""
+    v = np.unique(tri[idx]) if len(idx) else np.zeros(0, int)
+    row = {"k": int(k), "outcome": outcome, "n_tri": int(len(idx))}
+    if len(v):
+        uv = P[v]
+        row.update({"n_verts": int(len(v)), "u": round(float(uv[:, 0].mean()), 1), "v": round(float(uv[:, 1].mean()), 1),
+                    "box": [int(uv[:, 0].min()), int(uv[:, 1].min()), int(uv[:, 0].max()), int(uv[:, 1].max())]})
+    row.update({a: round(float(b), 3) for a, b in (extra or {}).items()})
+    print("OBJ " + json.dumps(row), flush=True)
+
+
 def solve_object(cams, ks, r, uv, tri_o, lab, m_init=None, fix_motion=False, contact_y=None, contacts=None,
                  ride=None):
     """Joint planar motion of one object over the clip and depths of its vertices (reference rays)."""
@@ -862,7 +876,11 @@ def solve_object(cams, ks, r, uv, tri_o, lab, m_init=None, fix_motion=False, con
             "speed_mps": float(np.linalg.norm(M[min(F - 1, r + 1), 1:] - M[max(0, r - 1), 1:]) /
                                (min(F - 1, r + 1) - max(0, r - 1)) * 10.0 *               # time slots of 0.1 s
                                ((min(F - 1, r + 1) - max(0, r - 1)) / (ks[min(F - 1, r + 1)] - ks[max(0, r - 1)]))),
-            "X_ipm": np.c_[itm.ground_point(cams[ks[r]], U[:, r]), np.zeros(n)]}
+            "X_ipm": np.c_[itm.ground_point(cams[ks[r]], U[:, r]), np.zeros(n)],
+            # the window's own problem, for the solve over the whole track (car_ba.py): tracks, reference rays, depth
+            # bounds, surface pairs, ground anchors and tyre contacts (local vertex indices)
+            "ba": {"U": U.astype(np.float32), "Cr": Cr, "Dr": Dr, "s": s, "lo": lo[nm:], "hi": hi[nm:], "t1": t1,
+                   "t2": t2, "w": w, "bi": bi, "z_anchor": z_anchor, "Xc": Xc, "Uc": Uc}}
 
 
 # --- LiDAR (evaluation only) ----------------------------------------------------------------------------------
@@ -1097,6 +1115,8 @@ def run(seq, k, ground):
         objs = [np.nonzero((tb == g).all(1))[0] for g in range(int(body_of.max()) + 1)]
         ride_of = {}
         for g, o in enumerate(objs):
+            if OBJ_LOG and len(o) < MIN_TRI:
+                log_object(k, P, tri, o, "too few triangles")
             if len(o) >= MIN_TRI:
                 o = largest_part(tri, o)
                 ride_of[id(o)] = seg_vis["rides"][g]
@@ -1111,6 +1131,8 @@ def run(seq, k, ground):
             cy = float(np.max(cuv[:, r, 1]))           # the mirror image begins where the tyres touch the road
         ride = ride_of[id(idx0)] if body_of is not None else None
         s = solve_object(cams, ks, r, uv, tri[idx], lab, contact_y=cy, contacts=cuv, ride=ride)
+        if OBJ_LOG and s is None:
+            log_object(k, P, tri, idx0, "solve failed")
         if s is not None and len(s["contacts"]) and (s["contact_res"] > CONTACT_RES).any():
             # a contact that does not move with the car (a wrong rim, a reflection): dropped, solved again
             good_c = np.isin(np.arange(len(cuv)), np.nonzero(
@@ -1130,6 +1152,8 @@ def run(seq, k, ground):
             idx = idx[~np.isin(tri[idx], bad).any(1)]
             idx = largest_part(tri, idx)
             if len(idx) < MIN_TRI:
+                if OBJ_LOG:
+                    log_object(k, P, tri, idx0, "pruned away")
                 s = None
                 break
             cy = contact_y(grays[r], P, tri, idx) if MIRROR else None
@@ -1137,6 +1161,11 @@ def run(seq, k, ground):
         if s is not None:
             body = ~np.isin(s["verts"], s["mirror"])
             s["flat"] = bool(np.percentile(s["X"][body, 2], 95) < FLAT_H) if body.any() else True
+        if OBJ_LOG and s is not None:
+            why = ("too slow" if s["speed_mps"] < MIN_SPEED else "too few vertices" if len(s["verts"]) < MIN_VERTS
+                   else "flat" if s["flat"] else "accepted")
+            log_object(k, P, tri, idx0, why, {"speed": s["speed_mps"], "verts": len(s["verts"]),
+                                               "px": s["reprojection_px"]})
         if s is not None and (s["speed_mps"] < MIN_SPEED or len(s["verts"]) < MIN_VERTS or s["flat"]):
             # too slow, too little evidence, or flat (a moving shadow / reflection strip on the road): road surface
             static_tri[idx0] = (ahead & near)[tri[idx0]].all(1)      # does not really move: flat like the road
@@ -1430,7 +1459,8 @@ def dump_objects(path, seq, res):
                     "tri_bgr": triangle_colours(seq.frames[k], P[v], T),
                     "body": keep, "filled": np.isin(v, s.get("filled", [])), "bottom": np.isin(v, s["bottom"]),
                     "vel": vel, "speed_mps": s["speed_mps"], "camera": res["C"],
-                    "reprojection_px": s["reprojection_px"]})
+                    "reprojection_px": s["reprojection_px"],
+                    "ks": list(res["ks"]), "r": r, "M": M, "centre": s["centre"], "ba": s["ba"]})
     with open(path, "wb") as f:
         pickle.dump(out, f)
 

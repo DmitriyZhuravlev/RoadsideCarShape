@@ -44,8 +44,9 @@ import v2x_seq_shape as vs
 
 CELL = 0.1                                   # m
 MIN_VIEWS = 2
-MIN_TRACK = 5                                # windows
-GATE, GATE_REL, MAX_GAP = 2.5, 0.04, 6       # m, share of the range, frames
+MIN_TRACK = int(os.environ.get("MIN_TRACK", "5"))     # windows: shorter tracks get no model
+GATE, GATE_REL = 2.5, 0.04                            # m, share of the range
+MAX_GAP = int(os.environ.get("MAX_GAP", "6"))         # frames a track may skip (a window without its detection)
 GROUND_H = 0.25
 VOTE = float(os.environ.get("VOTE", "0.2"))      # share of the windows that must see a column
 DENS_REL = float(os.environ.get("DENS_REL", "0.25"))
@@ -56,27 +57,63 @@ OUT_SUFFIX = os.environ.get("OUT_SUFFIX", "")
 RIDE_TABLE_OUT = os.environ.get("RIDE_TABLE_OUT", "")
 CABIN = os.environ.get("CABIN", "1") == "1"         # the cabin from the full silhouettes (visual hull)
 CARVE_VOTE = float(os.environ.get("CARVE_VOTE", "0.95"))   # share of the windows that must see a voxel inside
+CARVE_VOTE_PRIOR = float(os.environ.get("CARVE_VOTE_PRIOR", "0.8"))    # the same for cars no two side-on windows saw:
+                                       # the length prior bounds them, the strict vote only cuts volume (0.95 -> 0.8:
+                                       # A +0.010, B +0.040, V2X-Seq-SPD 0082 +0.017 with BA=1 EDGE_DROP=1)
 CARVE_DILATE = int(os.environ.get("CARVE_DILATE", "0"))      # cells the body footprint is widened for the cabin
 CARVE_FOOT = os.environ.get("CARVE_FOOT", "0") == "1"        # restrict the visual hull to the body footprint
 CARVE_ZMAX = float(os.environ.get("CARVE_ZMAX", "1.9"))   # m: the silhouette cone smears up toward the camera
-LEN_MAX = float(os.environ.get("LEN_MAX", "0"))           # m: trim longer cars at the camera end (0: off)
+LEN_MAX = float(os.environ.get("LEN_MAX", "4.6"))         # m: trim longer cars at the camera end (0: off)
+LEN_PRIOR = os.environ.get("LEN_PRIOR", "1") == "1"       # LEN_MAX only for cars no two windows saw side-on (their
+                                                          # length was never measured across the ray; 84 cars: 0.583
+                                                          # against 0.579 for all cars, vans not cut); 0: all cars
 BODY_FIELD = os.environ.get("BODY_FIELD", "1") == "1"        # blend the triangulated body field in (0: hull only)
 # lower edge of the colour body above the road (no tyres, the darker lower part falls out of the body cluster), m
 CLASSIFY = os.environ.get("CLASSIFY", "image")    # body type from the side-view silhouette, or "3d" profile
 TYPE_RIDE = {"sedan": 0.40, "hatchback": 0.40, "SUV": 0.52, "van/MPV": 0.48, "unknown": 0.45}
 TYPE_W = {"sedan": 1.90, "hatchback": 1.85, "SUV": 1.95, "van/MPV": 2.05, "unknown": 2.10}
+# two-cuboid profile of a body type: shoulder height (m), roof height (m), cabin x-range as a share of the half
+# length (-1 rear .. +1 front; sedan: boot behind, hood in front; van: one box). Priors on the shape directions one
+# camera never measures for a car it only sees end-on - the same class of prior as TYPE_W and LEN_MAX
+TYPE_BOX = {"sedan": (0.85, 1.45, (-0.55, 0.30)), "hatchback": (0.90, 1.50, (-0.80, 0.25)),
+            "SUV": (1.00, 1.68, (-0.65, 0.30)), "van/MPV": (1.30, 1.85, (-0.90, 0.90)),
+            "unknown": (0.85, 1.45, (-0.55, 0.30))}
+BOX_SLOPES = os.environ.get("BOX_SLOPES", "1") == "1"   # the prior's cabin with a sloped windshield / rear window
+BOX_FRONT, BOX_REAR = 0.9, 0.6                          # m: their lengths along the car
+BOX_PRIOR = os.environ.get("BOX_PRIOR", "1") == "1"    # a car no window ever saw side-on (n_side < 2: its shape was
+                                                       # never measured, only the silhouette cone) is completed as
+                                                       # its body type's two cuboids on the capped footprint, not
+                                                       # carved from uninformative silhouettes
 TYPE_WIDTH = os.environ.get("TYPE_WIDTH", "1") == "1"      # clip the width to the body type's prior
 RANGE_HULL = float(os.environ.get("RANGE_HULL", "40"))     # m: nearer tracks keep the silhouette hull only
 W_MEDIAN = os.environ.get("W_MEDIAN", "1") == "1"          # weight windows by their reprojection error
 SIL_SNAP = os.environ.get("SIL_SNAP", "1") == "1"          # snap silhouettes to image edges (sub-pixel hull)
 ICP_ROUNDS = int(os.environ.get("ICP_ROUNDS", "3"))
+BA = os.environ.get("BA", "1") == "1"           # one rigid car per track: windows solved together (car_ba.py), no ICP
+                                                # (A 0.583 -> 0.601, B 0.486 -> 0.524 with EDGE_DROP); dumps without the
+                                                # "ba" field (older windows) fall back to the windows' own solves + ICP
+BA_CACHE = os.environ.get("BA_CACHE", "")      # folder: track solves cached per track (fusion tests reuse them)
+EDGE_DROP = os.environ.get("EDGE_DROP", "1") == "1"   # outline vertices (sliding mask edge) out of the surface
+                                                      # (without it the track solve stretches cars by 0.5 m)
 MATCH_GATE = float(os.environ.get("MATCH_GATE", "3.0"))   # m: evaluation only, label match per window
 SIL_POSE = os.environ.get("SIL_POSE", "0") == "1"          # refine window poses to the silhouettes (off: worse in 3D)
 SIL_SEARCH = tuple(float(v) for v in os.environ.get("SIL_SEARCH", "1.0,2.0,4.0").split(","))   # m along, m across, deg
 SIL_SEARCH = (SIL_SEARCH[0], SIL_SEARCH[1], np.radians(SIL_SEARCH[2]))  # search half-widths of the pose refinement
 SIL_SMOOTH = 5                                             # windows: running median of the pose corrections
 SIL_SIDE = float(os.environ.get("SIL_SIDE", "0.7"))        # refine only windows that see the car this side-on
-CAR_COLOUR = os.environ.get("CAR_COLOUR", "best")  # "best": each vertex the original pixel of its best view; "blend": cos^4 average
+COLOUR_ALIGN = os.environ.get("COLOUR_ALIGN", "1") == "1"   # colours: each view's projection first shifted onto its
+                                                         # silhouette (pose errors at the track ends move the glass)
+MESH_SMOOTH = os.environ.get("MESH_SMOOTH", "1") == "1"   # MESH=field: the heights regularised first (convex across,
+                                                          # spikes and dips removed along; regularise_heights)
+MESH_DIP = int(os.environ.get("MESH_DIP", "7"))          # cells: dips along the car narrower than this are filled
+MESH_SIGMA = float(os.environ.get("MESH_SIGMA", "1.2"))  # cells: the final Gaussian of the regularised heights
+POISSON = os.environ.get("POISSON", "1") == "1"         # the shown model smoothed by plain Poisson surface reconstruction
+POISSON_H = float(os.environ.get("POISSON_H", "0.06"))   # m: its grid
+MESH = os.environ.get("MESH", "field")      # the shown and coloured model: "hull" (convex) or "field" (the height
+                                          # field's own surface: hood, windshield and roof as separate faces)
+CAR_COLOUR = os.environ.get("CAR_COLOUR", "best")  # "best": original pixels of the best views (medoid); "blend": cos^4 average
+CABIN_TAPER = os.environ.get("CABIN_TAPER", "1") == "1"   # cap the cabin to a tapered profile (roof ~72 % of the width;
+                                                          # A +0.002, B +0.002 IoU, glass off the roof); 0: off
 PANELS = os.environ.get("PANELS", "whole_scene_video_full_*")
 W_MAX = 2.1                                  # m: widest car (class prior used with the symmetry plane)
 INK, MUTED = "#1f1f1e", "#8a8984"
@@ -157,11 +194,17 @@ def window_points(det, spacing=0.05):
     about `spacing`, colours interpolated (the vertices alone cover only a few cells of the height field)."""
     T = det["tri"]
     on = det["body"][T].all(1)
+    body = det["body"]
+    if EDGE_DROP:                     # the mask outline: the tracked edge slides over the car, its depth is no surface
+        import car_ba
+        edge = car_ba.outline(det)
+        on &= ~edge[T].any(1)
+        body = body & ~edge
     T = T[on]
     tri_col = det["tri_bgr"][on].astype(float) if "tri_bgr" in det else None   # mean image colour per triangle
     X, col = det["X"], det["bgr"].astype(float)
     if not len(T):
-        return X[det["body"]], col[det["body"]]
+        return X[body], col[body]
     A, B, C = X[T[:, 0]], X[T[:, 1]], X[T[:, 2]]
     area = 0.5 * np.linalg.norm(np.cross(B - A, C - A), axis=1)
     ok = area < 1.5                                            # long slivers across the outline are no surface
@@ -174,7 +217,7 @@ def window_points(det, spacing=0.05):
     w = np.c_[1 - u - v, u, v]
     P = (w[:, :, None] * X[T[idx]]).sum(1)
     Cc = tri_col[idx] if tri_col is not None else (w[:, :, None] * col[T[idx]]).sum(1)
-    return np.vstack([P, X[det["body"]]]), np.vstack([Cc, col[det["body"]]])
+    return np.vstack([P, X[body]]), np.vstack([Cc, col[body]])
 
 
 def icp_2d(A, B, iters=8, trim=0.7, max_d=0.6):
@@ -198,17 +241,22 @@ def icp_2d(A, B, iters=8, trim=0.7, max_d=0.6):
 
 def track_in_car_frame(track):
     pos, head = smooth_path(track)
+    rigid = all("ba_pose" in d for _, d in track)    # one rigid car (car_ba.py): the pose of each reference frame
+    if rigid:
+        Q = np.array([d["ba_pose"] for _, d in track])
+        pos, head = Q[:, 1:], Q[:, 0]
     parts = []
     for (k, d), p, h in zip(track, pos, head):
         X, col = window_points(d)
         # every window centred on its own surface: the along-ray depth error of a window (metres at 60-70 m) would
         # otherwise smear the car sideways; the view-dependent part is left to the ICP below
-        Y = to_car(X, d["c"], h)
+        cen = p if rigid else d["c"]
+        Y = to_car(X, cen, h)
         med = np.median(Y[:, :2], axis=0)
         ok = np.all(np.abs(Y[:, :2] - med) < [3.2, 2.0], axis=1)            # outliers of the window
         A = rot(h).T
-        parts.append([Y[ok], col[ok], k, A, -A @ d["c"]])                   # car xy = A @ world xy + b
-    for _ in range(ICP_ROUNDS):
+        parts.append([Y[ok], col[ok], k, A, -A @ cen])                      # car xy = A @ world xy + b
+    for _ in range(0 if rigid else ICP_ROUNDS):
         for i in range(len(parts)):
             others = np.vstack([q[0] for j, q in enumerate(parts) if j != i])
             th, t = icp_2d(parts[i][0], others)
@@ -446,7 +494,7 @@ def carve(seq, f, sils, vote=CARVE_VOTE, zmax=CARVE_ZMAX, use_foot=None):
     lab_, n = cc_label(Hc > GROUND_H)
     if n > 1:
         Hc = np.where(lab_ == 1 + np.argmax(np.bincount(lab_.ravel())[1:]), Hc, 0.0)
-    if LEN_MAX:
+    if LEN_MAX and (not LEN_PRIOR or f["n_side"] < 2):     # a measured length is never trimmed
         Hc = trim_camera_end(seq, f, Hc, LEN_MAX)
     return Hc
 
@@ -543,6 +591,67 @@ def refine_poses(seq, f, sils, H):
     return float(np.mean(before)), float(np.mean(after))
 
 
+def concave_envelope(y, h):
+    """Upper concave envelope of a profile: the smallest concave function >= h over y (the top of the convex hull of
+    the region under the curve). y (n,) increasing, h (n,). A car's cross-section is close to convex: the envelope
+    fills the notches of a noisy roof without touching its overall shape."""
+    if len(y) < 3:
+        return np.asarray(h, float).copy()
+    hull = []
+    for c in zip(y, h):
+        while len(hull) >= 2 and ((hull[-1][0] - hull[-2][0]) * (c[1] - hull[-2][1])
+                                  - (hull[-1][1] - hull[-2][1]) * (c[0] - hull[-2][0])) >= 0:
+            hull.pop()                      # the middle point lies on or below the chord: not on the upper hull
+        hull.append(c)
+    hy, hh = np.array(hull).T
+    return np.interp(y, hy, hh)
+
+
+def regularise_heights(H, ys, spike=3, dip=5, sigma=0.7):
+    """The height field between the raw surface and the convex hull: across the car every cross-section becomes convex
+    (its concave envelope: notches and holes in the roof filled), along it narrow spikes and thin sheets go (grey
+    opening over `spike` cells) and narrow dips are filled (grey closing over `dip` cells) - a monotone step such as
+    hood -> windshield -> roof survives both, unlike under the hull. The footprint's holes are filled; a light
+    Gaussian last (`sigma` cells)."""
+    from scipy.ndimage import binary_fill_holes, gaussian_filter, grey_opening
+    occ = binary_fill_holes(H > GROUND_H)
+    if not occ.any():
+        return H
+    G = np.where(occ, np.maximum(H, GROUND_H + 0.01), 0.0)
+    G = grey_opening(G, size=(spike, 1))
+    G = grey_closing(G, size=(dip, 1))
+    for i in np.nonzero(occ.any(1))[0]:
+        j = np.nonzero(occ[i])[0]
+        G[i, j[0]:j[-1] + 1] = concave_envelope(ys[j[0]:j[-1] + 1], G[i, j[0]:j[-1] + 1])
+    occ = occ | (G > GROUND_H)
+    G = gaussian_filter(G, sigma) / np.maximum(gaussian_filter(occ.astype(float), sigma), 1e-6)
+    return np.where(occ, G, 0.0)
+
+
+def model_mesh(f):
+    """The car's mesh to colour and show: the convex hull of the height field, subdivided three times (MESH=hull), or
+    the height field's own surface (MESH=field: marching cubes + smoothing; not convex, so the hood, the windshield and
+    the roof are separate faces and the windshield's colour is not spread over a hull slope from bumper to roof).
+    f is a dict with "H", "C", "xs", "ys" (and "n_side"). Returns (V, F) or None."""
+    if MESH == "field":
+        H = f["H"]
+        if MESH_SMOOTH:                    # single noisy columns make spikes, notches and thin sheets on the surface
+            H = regularise_heights(H, f["ys"], dip=MESH_DIP, sigma=MESH_SIGMA)
+        V, F, _ = mesh_from_heights(H, f["C"], f["xs"], f["ys"])
+        if len(V) == 0:
+            return None
+        # marching cubes orients the faces consistently; outward when the signed volume is positive
+        vol = np.einsum("ij,ij->i", V[F[:, 0]], np.cross(V[F[:, 1]], V[F[:, 2]])).sum()
+        return V, (F if vol > 0 else F[:, ::-1].copy())
+    hull = convex_hull_model(f["H"], f["C"], f["xs"], f["ys"])
+    if hull is None:
+        return None
+    V, F = hull[0], orient_outward(hull[0], hull[1])
+    for _ in range(3):
+        V, F = mr.subdivide(V, F)
+    return V, F
+
+
 def orient_outward(V, F):
     """Every triangle of a closed convex mesh facing outward."""
     n = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]])
@@ -558,20 +667,43 @@ def pixel_colours(seq, f, sils, V, F, min_cos=0.15, sharp=4.0):
     return blend_colours(seq, f, sils, V, F, min_cos, sharp)
 
 
-def best_view_colours(seq, f, sils, V, F, min_cos=0.15):
-    """Colour of every vertex = the ORIGINAL PIXEL of the one window that sees it most directly and largest (cos of the
+def best_shift(model, sil, reach=48):
+    """Image shift (du, dv) in px that moves the model's projected outline `model` onto the observed silhouette `sil`
+    (bool arrays, same shape) with the largest IoU, within +-reach; returns (du, dv, iou). The overlap for every shift
+    at once by FFT correlation; the model's area does not change with the shift (a model cut by the crop border scores
+    a little low - harmless for a choice between shifts)."""
+    from scipy.signal import fftconvolve
+    if not model.any() or not sil.any():
+        return 0, 0, 0.0
+    a, b = model.astype(np.float32), sil.astype(np.float32)
+    inter = fftconvolve(b, a[::-1, ::-1], mode="full")          # inter[dv + H - 1, du + W - 1]
+    H, W = a.shape
+    dv, du = np.mgrid[-(H - 1):H, -(W - 1):W]
+    iou = inter / np.maximum(a.sum() + b.sum() - inter, 1e-9)
+    iou[(np.abs(du) > reach) | (np.abs(dv) > reach)] = -1
+    i = np.unravel_index(np.argmax(iou), iou.shape)
+    return int(du[i]), int(dv[i]), float(iou[i])
+
+
+def best_view_colours(seq, f, sils, V, F, min_cos=0.15, k_best=5, inset=2):
+    """Colour of every vertex = an ORIGINAL PIXEL of the windows that see it most directly and largest (cos of the
     angle to the camera over the distance), where it faces the camera, is not hidden behind another part of the car
-    (z-buffer of the model's own vertices) and lies inside the car's silhouette; sampled bilinearly, not averaged, so
-    the video's colours stay as they are. A vertex no window sees takes its mirror image's (the car is symmetric); still
-    unseen: the nearest seen vertex's."""
+    (z-buffer of the model's own vertices) and lies `inset` px inside the car's silhouette (at the outline a small
+    error of the model already samples the road or another part); sampled bilinearly, not averaged.
+    - Of its k_best views the medoid pixel is kept: where the model's surface is a little off the car's, one view puts
+      the side window on the roof and the others do not, and the outlier is outvoted.
+    - Symmetric: a vertex and its mirror image both take the better seen of the two (the far side is otherwise
+      coloured from grazing views of whatever lies there). Never seen: the nearest seen vertex's colour."""
     N = mr.vertex_normals(V, F)
     edge = float(np.median(np.linalg.norm(V[F[:, 0]] - V[F[:, 1]], axis=1)))
-    best = np.full((2, len(V)), -1.0)
-    col = np.zeros((2, len(V), 3))
+    S = np.full((2, len(V), k_best), -np.inf)
+    Ck = np.zeros((2, len(V), k_best, 3))
+    ker = np.ones((2 * inset + 1, 2 * inset + 1), np.uint8)
     for k, sl in sils.items():
         if sl is None or k not in f["poses"]:
             continue
         m, x0, y0 = sl
+        m = cv2.erode((m > 0).astype(np.uint8), ker) if inset else m
         A, b = f["poses"][k]
         K, R, t = seq.cams[k]
         Cc = -np.linalg.solve(R, t)
@@ -583,24 +715,58 @@ def best_view_colours(seq, f, sils, V, F, min_cos=0.15):
             dist = np.linalg.norm(d, axis=1)
             cosang = np.sum(Nw * d, axis=1) / dist
             q, z = vs.project(seq.cams[k], W)
+            fit = 1.0
+            if COLOUR_ALIGN and (z > 0).sum() >= 3:   # the window's pose is a little off (track ends, near views):
+                hull = cv2.convexHull(np.round(q[z > 0] - [x0, y0]).astype(np.int32))   # outline onto its silhouette
+                mm = np.zeros(m.shape, np.uint8)
+                cv2.fillConvexPoly(mm, hull, 1)
+                du, dv, fit = best_shift(mm > 0, sl[0] > 0)
+                q = q + [du, dv]
             r = int(np.ceil(edge * K[0, 0] / np.median(z[z > 0]) / 2)) + 1 if (z > 0).any() else 1
             ok = (cosang > min_cos) & vs.visible(q, z, seq.shape, r, 1.5 * edge)
             mu, mv = np.round(q[:, 0]).astype(int) - x0, np.round(q[:, 1]).astype(int) - y0
             ok &= (mu >= 0) & (mv >= 0) & (mu < m.shape[1]) & (mv < m.shape[0])
             ok[ok] = m[mv[ok], mu[ok]] > 0
-            score = cosang / dist
-            upd = ok & (score > best[i])
-            if upd.any():
-                col[i, upd] = vs.bilinear(seq.frames[k], q[upd])
-                best[i, upd] = score[upd]
-    own = best[0] >= 0
-    out = np.where(own[:, None], col[0], col[1])
-    seen = own | (best[1] >= 0)
+            score = cosang / dist * (fit ** 2 if COLOUR_ALIGN else 1.0)   # views that fit the silhouette better first
+            if ok.any():
+                colour = np.zeros((len(V), 3))
+                colour[ok] = vs.bilinear(seq.frames[k], q[ok])
+                vs.topk_update(S[i], Ck[i], score, colour, ok)
+    (c0, s0, b0), (c1, s1, b1) = vs.topk_medoid(S[0], Ck[0]), vs.topk_medoid(S[1], Ck[1])
+    out = np.where((b0 >= b1)[:, None], c0, c1)          # the better seen of the vertex and its mirror image
+    seen = s0 | s1
     if not seen.any():
         return np.full((len(V), 3), 150.0)
-    if not seen.all():
-        from scipy.spatial import cKDTree
-        out[~seen] = out[seen][cKDTree(V[seen]).query(V[~seen])[1]]
+    return fill_unseen(V, out, seen)
+
+
+def fill_unseen(V, colours, seen, near=0.3, band=0.1, belt=0.62):
+    """Colours of the vertices no view saw. Close to a seen vertex (within `near` m): that vertex's colour (a small
+    hole). Farther (a side the camera never faced): below the beltline ONE body colour, the median of the seen
+    vertices between 30 % of the height and the beltline (per height, the rear's lights and bumper would stripe the
+    whole side); above it the median colour of the seen vertices at the same height (bands of `band` m): glass at
+    window height, paint on the roof. A band without seen vertices takes the nearest band that has some."""
+    out = colours.copy()
+    if seen.all() or not seen.any():
+        return out
+    d, j = cKDTree(V[seen]).query(V[~seen])
+    unseen = np.nonzero(~seen)[0]
+    close = d <= near
+    out[unseen[close]] = colours[seen][j[close]]
+    far = unseen[~close]
+    if len(far):
+        zs, cs = V[seen, 2], colours[seen]
+        line = belt * V[:, 2].max()
+        low, high = far[V[far, 2] < line], far[V[far, 2] >= line]
+        for sel in ((zs >= 0.3 * V[:, 2].max()) & (zs < line), zs < line, np.ones(len(zs), bool)):
+            if sel.any():
+                out[low] = np.median(cs[sel], axis=0)
+                break
+        if len(high):
+            bs = np.floor(zs / band).astype(int)
+            ub = np.unique(bs)
+            med = np.array([np.median(cs[bs == b], axis=0) for b in ub])
+            out[high] = med[np.abs(np.floor(V[high, 2] / band).astype(int)[:, None] - ub[None]).argmin(1)]
     return out
 
 
@@ -846,6 +1012,43 @@ def resample(Hm, xs, ys, xq, yq):
     return np.where(ok, Hm[np.clip(ix, 0, len(xs) - 1), np.clip(iy, 0, len(ys) - 1)], 0.0)
 
 
+def taper_cabin(H, ys, top=0.72, belt=0.62, ground_h=GROUND_H):
+    """A car's cabin is narrower than its body: the roof spans about `top` of the body width and the side windows lean
+    inward from the belt line (`belt` of the height). One camera barely constrains this (the near upper edge of the
+    cabin is never seen against the background), so the height field is capped by that profile across the car."""
+    occ = H > ground_h
+    if not occ.any():
+        return H
+    hmax = H[occ].max()
+    half = np.abs(ys[occ.any(0)]).max()
+    a = top * half
+    ay = np.abs(ys)
+    cap = np.where((ay > a) & (ay <= half), hmax - (1 - belt) * hmax * (ay - a) / max(half - a, 1e-9), hmax)
+    return np.where(occ, np.minimum(H, cap[None, :]), H)
+
+
+def box_prior_field(H, xs, ys, btype, ground_h=GROUND_H):
+    """Two-cuboid completion of a car no window ever saw side-on (n_side < 2): its shape was never measured, only the
+    silhouette cone - which for a car seen end-on is long, narrow and rising toward the camera. The capped footprint
+    (LEN_MAX) is kept; the heights become the body type's canonical profile: a lower box up to the shoulder line and
+    the cabin box above it, across the full width - CABIN_TAPER then gives it the same roof taper as the measured
+    cars. A solid-IoU reference is box-like: a plain box of the right size scores better against it than a carved
+    cone, and unlike the cone the profile carries no measurement to destroy."""
+    shoulder, roof, (c0, c1) = TYPE_BOX.get(btype, TYPE_BOX["unknown"])
+    occ = H > ground_h
+    if not occ.any():
+        return H
+    ix = np.nonzero(occ.any(1))[0]
+    half = max(xs[ix[-1]] - xs[ix[0]] + CELL, 1.0) / 2
+    x0, x1 = c0 * half, c1 * half
+    if BOX_SLOPES:          # the cabin's ends slope (windshield in front, rear window behind) like a car's
+        # the roof over the whole cabin box; the windshield runs down over the hood, the rear window over the boot
+        prof = np.interp(xs, [x0 - BOX_REAR, x0, x1, x1 + BOX_FRONT], [shoulder, roof, roof, shoulder])
+    else:
+        prof = np.where((xs >= x0) & (xs <= x1), roof, shoulder)
+    return np.where(occ, prof[:, None], 0.0)
+
+
 def common_grid(xa, ya, xb, yb, step):
     """A uniform grid (spacing step, symmetric about 0) covering two centred grids, e.g. a model's and a LiDAR
     reference's: the LiDAR grid spans only the labelled box, so a model longer than the label must be scored on a grid
@@ -855,8 +1058,12 @@ def common_grid(xa, ya, xb, yb, step):
     return (np.arange(-n, n) + 0.5) * step, (np.arange(-m, m) + 0.5) * step
 
 
-def shape_scores(Hm, xs, ys, Lt, lx, ly):
-    """After centring both footprints and trying both headings: solid IoU and mean |height difference|."""
+def shape_scores(Hm, xs, ys, Lt, lx, ly, Lt_raw=None):
+    """After centring both footprints and trying both headings: solid IoU and mean |height difference|.
+    Lt_raw (evaluation only): the same reference BEFORE close_lidar_holes; when given, `scanned_iou` is the solid IoU
+    over ALL cells of the common grid except the ones the closing invented (closed reference occupied, raw reference
+    empty there). Cells outside the car stay in, so the model's overshoot is still penalised; only reference volume
+    nobody measured is dropped. The centring and the heading (flip) are the ones the full-grid IoU chose."""
     def centred(H, x, y):
         occ = H > GROUND_H
         if not occ.any():
@@ -869,6 +1076,12 @@ def shape_scores(Hm, xs, ys, Lt, lx, ly):
     # it alone ignored whatever of the model lies outside the box and inflated the IoU of models longer than the car
     gx, gy = common_grid(xs2, ys2, lx2, ly2, lx[1] - lx[0])
     L = resample(Lt, lx2, ly2, gx, gy)
+    R = None
+    if Lt_raw is not None:
+        # the no-return mask from the raw occupancy, thresholded on its own grid and nearest-resampled: a resampled
+        # height could otherwise shift the car's edge cells in or out of the mask
+        ret = resample((Lt_raw > GROUND_H).astype(float), lx2, ly2, gx, gy) > 0.5
+        R = ~(~ret & (L > GROUND_H))     # keep everything except what the closing filled in the reference
     best = None
     for flip in (1, -1):
         H = resample(Hm, xs2, ys2, gx, gy) if flip == 1 else resample(Hm[::-1], -xs2[::-1], ys2, gx, gy)
@@ -879,6 +1092,9 @@ def shape_scores(Hm, xs, ys, Lt, lx, ly):
         s = {"iou": float(inter / max(union, 1e-9)),
              "height_err_cm": float(100 * np.median(np.abs(H[both] - L[both]))) if both.any() else float("nan"),
              "footprint_iou": float((a & b).sum() / max((a | b).sum(), 1))}
+        if R is not None and R.any():
+            hi, lo = np.where(a, H, 0), np.where(b, L, 0)
+            s["scanned_iou"] = float(np.minimum(hi, lo)[R].sum() / max(np.maximum(hi, lo)[R].sum(), 1e-9))
         s["flip"] = flip
         if best is None or s["iou"] > best["iou"]:
             best = s
@@ -900,6 +1116,17 @@ def pose_errors(seq, tid, track, pos, head, x_off):
 
 
 # --- run -----------------------------------------------------------------------------------------------------------
+def side_on_windows(track, min_sin=0.5):
+    """Number of windows that see the car side-on: |sin(heading - viewing ray)| >= min_sin. Seen from the side, the
+    car's length lies across the viewing ray and the image measures it; seen end-on it lies along the ray, where the
+    depth noise smears it."""
+    n = 0
+    for _, d in track:
+        ray = d["c"] - d["camera"][:2]
+        n += abs(np.sin(np.arctan2(d["vel"][1], d["vel"][0]) - np.arctan2(ray[1], ray[0]))) >= min_sin
+    return int(n)
+
+
 def fuse_track(track):
     parts, pos, head = track_in_car_frame(track)
     allp = np.vstack([p[0] for p in parts])
@@ -913,12 +1140,9 @@ def fuse_track(track):
             p[0], p[1] = p[0][keep], p[1][keep]
     if all(len(p[0]) == 0 for p in parts):   # nothing left within the width: no model for this track
         return None
-    Hm, Cm, xs, ys, views = height_field(parts, mirror=SYMMETRY, min_views=max(MIN_VIEWS, int(VOTE * len(parts))),
-                                         w=np.array([1.0 / (0.5 + t[1]["reprojection_px"]) for t in track])
-                                         if W_MEDIAN else None)
-    Hn, Cn, xsn, ysn, _ = height_field(parts, mirror=False, min_views=max(MIN_VIEWS, int(VOTE * len(parts))),
-                                       w=np.array([1.0 / (0.5 + t[1]["reprojection_px"]) for t in track])
-                                       if W_MEDIAN else None)
+    w = np.array([1.0 / (0.5 + t[1]["reprojection_px"]) for t in track]) if W_MEDIAN else None
+    Hm, Cm, xs, ys, views = height_field(parts, mirror=SYMMETRY, min_views=max(MIN_VIEWS, int(VOTE * len(parts))), w=w)
+    Hn, Cn, xsn, ysn, _ = height_field(parts, mirror=False, min_views=max(MIN_VIEWS, int(VOTE * len(parts))), w=w)
     occ = Hm > GROUND_H
     x_off = 0.0
     if occ.any():
@@ -936,7 +1160,7 @@ def fuse_track(track):
             "parts": parts, "pos": pos, "head": head, "y0": float(y0), "sym_score": float(sym_score),
             "H": Hm, "C": Cm, "xs": xs_c, "ys": ys, "x_off": float(x_off), "views": views,
             "single": (Hs, xss, yss), "hull": hull, "painted": painted, "track": track,
-            "poses": {p[2]: (p[3], p[4]) for p in parts}}
+            "poses": {p[2]: (p[3], p[4]) for p in parts}, "n_side": side_on_windows(track)}
 
 
 def main():
@@ -950,30 +1174,45 @@ def main():
     print(f"{sum(len(d) for _, d in frames)} objects in {len(frames)} windows -> {len(tracks)} tracks of >= {MIN_TRACK}")
     rows, models = [], {}
     for n, tr in enumerate(tracks):
+        if BA:
+            import car_ba
+            p0, h0 = smooth_path(tr)
+            try:
+                solve = lambda: car_ba.adjust(seq, tr, p0, h0, drop_outline=EDGE_DROP)
+                if BA_CACHE:
+                    car_ba.ba_cached(BA_CACHE, DUMPS, tr, solve, tag="_e" if EDGE_DROP else "")
+                else:
+                    solve()
+            except (ValueError, np.linalg.LinAlgError) as e:      # stays with the windows' own solves and the ICP
+                print("track solve failed:", e, flush=True)
         f = fuse_track(tr)
         if f is None:                          # skipped; the other tracks keep their numbers
             continue
         if CABIN:
             sils = {k: full_silhouette(seq, k, d) for k, d in tr}
             near = float(np.median([d["range"] for _, d in tr])) < RANGE_HULL
-            Hc = carve(seq, f, sils, use_foot=CARVE_FOOT and not near)
+            vote = CARVE_VOTE_PRIOR if f["n_side"] < 2 else CARVE_VOTE
+            Hc = carve(seq, f, sils, vote=vote, use_foot=CARVE_FOOT and not near)
             if SIL_POSE:                             # poses to the silhouettes, then the cabin carved again
                 H0 = np.maximum(Hc, np.where(f["H"] > GROUND_H, f["H"], 0)) if BODY_FIELD and not near else Hc
                 f["sil_fit"] = refine_poses(seq, f, sils, H0)
-                Hc = carve(seq, f, sils, use_foot=CARVE_FOOT and not near)
+                Hc = carve(seq, f, sils, vote=vote, use_foot=CARVE_FOOT and not near)
             f["H_body"] = f["H"]
             if BODY_FIELD and not near:
                 f["H"] = np.maximum(Hc, np.where(f["H"] > GROUND_H, f["H"], 0))   # body field + carved cabin
             else:
                 f["H"] = Hc                                                      # the silhouettes alone
+            if BOX_PRIOR and f["n_side"] < 2:    # the shape was never measured: the type's two cuboids, not the cone
+                f["H"] = box_prior_field(f["H"], f["xs"], f["ys"], body_type(f["H"], f["xs"])[0])
             hull = convex_hull_model(f["H"], f["C"], f["xs"], f["ys"])
             f["hull"] = hull
-            if hull is not None:
-                V, Fh, _, _ = hull
-                Fh = orient_outward(V, Fh)
-                for _ in range(3):
-                    V, Fh = mr.subdivide(V, Fh)
+            mesh = model_mesh(f) if hull is not None else None
+            if mesh is not None:
+                V, Fh = mesh
                 vcol = pixel_colours(seq, f, sils, V, Fh)
+                if POISSON:                  # the shown model: its plain Poisson surface (spsr.py, no screening)
+                    import spsr
+                    V, Fh, vcol = spsr.smooth_mesh(V, Fh, vcol, h=POISSON_H, alpha=0.0)
                 f["painted"] = (V, Fh, vcol[Fh].mean(1))
                 f["vertex_colours"] = vcol
         btype3d, feats3d = body_type(f["H"], f["xs"])
@@ -988,14 +1227,17 @@ def main():
             w = TYPE_W.get(btype, W_MAX)
             keep = np.abs(f["ys"]) <= w / 2          # the car frame is already centred on the symmetry plane
             f["H"][:, ~keep] = 0.0
+            if CABIN_TAPER:
+                f["H"] = taper_cabin(f["H"], f["ys"])
             hull = convex_hull_model(f["H"], f["C"], f["xs"], f["ys"])
             f["hull"] = hull
-            if hull is not None and CABIN:
-                V, Fh, _, _ = hull
-                Fh = orient_outward(V, Fh)
-                for _ in range(3):
-                    V, Fh = mr.subdivide(V, Fh)
+            mesh = model_mesh(f) if hull is not None and CABIN else None
+            if mesh is not None:
+                V, Fh = mesh
                 vcol = pixel_colours(seq, f, sils, V, Fh)
+                if POISSON:                  # the shown model: its plain Poisson surface (spsr.py, no screening)
+                    import spsr
+                    V, Fh, vcol = spsr.smooth_mesh(V, Fh, vcol, h=POISSON_H, alpha=0.0)
                 f["painted"] = (V, Fh, vcol[Fh].mean(1))
                 f["vertex_colours"] = vcol
         tid = match_label(seq, tr, f["pos"])
@@ -1006,7 +1248,8 @@ def main():
                **({"silhouette IoU before": f["sil_iou_before"], "silhouette IoU after": f["sil_iou_after"]}
                   if f.get("sil_fit") else {}),
                "range_m": float(np.median([d["range"] for _, d in tr])),
-               "speed_mps": float(np.median([d["speed_mps"] for _, d in tr])),
+               "speed_mps": float(np.median([d["speed_mps"] for _, d in tr])), "n_side": f["n_side"],
+               **({"ba": tr[0][1]["ba_info"]} if "ba_info" in tr[0][1] else {}),
                "length": L, "width": W, "height": Hh, "label": tid, "symmetry_y0": f["y0"], "body_type": btype,
                "body_type_3d": btype3d,
                **{f"feature {k}": v for k, v in feats.items()}}
@@ -1038,7 +1281,10 @@ def main():
                 row["flip"] = sc.pop("flip")
                 row.update({f"fused: {k}": v for k, v in sc.items()})
                 Lc = close_lidar_holes(Lt, lx[1] - lx[0])
-                sc = shape_scores(f["H"], f["xs"], f["ys"], Lc, lx, ly)
+                row["filled_share"] = float(((Lc > GROUND_H) & (Lt <= GROUND_H)).sum() /
+                                             max((Lc > GROUND_H).sum(), 1))       # of the closed reference's
+                # occupied cells, the share the closing invented (no return below them)
+                sc = shape_scores(f["H"], f["xs"], f["ys"], Lc, lx, ly, Lt)
                 sc.pop("flip")
                 row.update({f"fused closed: {k}": v for k, v in sc.items()})
                 Hs, xss, yss = f["single"]

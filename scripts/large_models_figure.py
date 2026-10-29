@@ -2,7 +2,7 @@
 N per dataset, best solid IoU against the closed LiDAR first, each from the same new viewpoint with its original pixels.
 
 Inputs: dataset/<run>/chosen.json and <clip>/cars.json (run_subset.py), code/3dseg/docs/cars_viewer_<tag>_<clip>/meshes.json.
-    python scripts/large_models_figure.py [N]
+    [MAX_DL=0.4] [OUT=path.png] python scripts/large_models_figure.py [N]
 """
 import json
 import os
@@ -18,6 +18,7 @@ DATA = os.path.expanduser("~/Documents/MyArticles/dataset")
 DOCS = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 RUNS = [("DAIR-V2X-C", "dair_c_runs", "dairc"), ("V2X-Seq-SPD", "spd_runs", "spd")]
 EYE = np.array([7.8, 8.4, 4.6])                    # front-left, from above (as in the roadside view)
+MAX_DL = float(os.environ.get("MAX_DL", "99"))     # m: only models whose length is this close to the label
 
 
 def models(run, tag):
@@ -30,7 +31,7 @@ def models(run, tag):
         meshes = json.load(open(mesh))
         for r in json.load(open(cars)):
             m = meshes.get(f"track {r['track']}")
-            if m is not None and "fused closed: iou" in r:
+            if m is not None and "fused closed: iou" in r and abs(r["length"] - r["label_length"]) <= MAX_DL:
                 out.append((r, c, m))
     return sorted(out, key=lambda t: -t[0]["fused closed: iou"])
 
@@ -56,7 +57,7 @@ def main():
                                    for r, c, m in ms]))
     w = max(r.shape[1] for r in rows)
     rows = [np.hstack([r, np.full((r.shape[0], w - r.shape[1], 3), 255, np.uint8)]) for r in rows]
-    cv2.imwrite(os.path.join(cf.FIG, "large_models.png"), np.vstack(rows))
+    cv2.imwrite(os.environ.get("OUT", os.path.join(cf.FIG, "large_models.png")), np.vstack(rows))
     print("large_models.png:", [len(models(run, tag)) for _, run, tag in RUNS], "models")
 
 

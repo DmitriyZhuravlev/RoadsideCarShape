@@ -39,7 +39,8 @@ import v2x_seq_shape as vs
 OUT = os.environ.get("VRU_OUT", os.path.join(vd.OUT_DIR, "vru"))   # one folder per sequence: track ids repeat
 VOTE = float(os.environ.get("VOTE", "0.75"))      # share of the carving frames whose silhouette must hold a voxel
 TRACK = os.environ.get("TRACK", "own")             # "label": the labelled 2D boxes as the tracker (given tracking)
-VOX_PX = float(os.environ.get("VOX_PX", "1.5"))   # voxel size in pixels at the object's range (2 - 6 cm)
+VOX_PX = float(os.environ.get("VOX_PX", "1.0"))   # voxel size in pixels at the object's range (1.2 - 6 cm)
+VOX_MIN = float(os.environ.get("VOX_MIN", "0.012"))   # m: finer only costs time; a pixel is the limit anyway
 VOX = 0.04                                          # m, set per object
 BG_STEP = 4                                         # every 4th frame for the median background
 MAX_SKIP = 15                                       # frames in a row without a silhouette (a car in front) before the track ends
@@ -349,15 +350,18 @@ def surface(occ):
     return V, F[:, ::-1].copy(), N
 
 
-def colours(fids, cams, sils, poses, ks, V, N):
-    """Vertex colours from the original pixels (best view): every vertex takes the pixel of the one frame where it is
-    seen most directly and largest - facing the camera, not hidden behind another part of the model (z-buffer), inside
-    the silhouette; a vertex never seen takes its mirror image's (the far side of a symmetric body); bilinear sampling.
-    Where neither was ever seen (the front and back of a body seen only from the side): the nearest seen vertex's."""
-    best = np.full((2, len(V)), -1.0)
-    col = np.zeros((2, len(V), 3))
+def colours(fids, cams, sils, poses, ks, V, N, k_best=5, inset=1):
+    """Vertex colours from the original pixels: of the k_best frames that see a vertex most directly and largest -
+    facing the camera, not hidden behind another part of the model (z-buffer), `inset` px inside the silhouette - the
+    medoid pixel (an outlier of one view, from a part the model does not quite cover, is outvoted); bilinear sampling.
+    Symmetric: a vertex and its mirror image take the better seen of the two. Never seen (the front and back of a
+    body seen only from the side): the nearest seen vertex's."""
+    S = np.full((2, len(V), k_best), -np.inf)
+    Ck = np.zeros((2, len(V), k_best, 3))
+    ker = np.ones((2 * inset + 1, 2 * inset + 1), np.uint8)
     for k in ks:
         img = frame(fids, k)
+        sil = cv2.erode(sils[k][0].astype(np.uint8), ker) > 0 if inset else sils[k][0]
         c, yaw = poses[k]
         cen = -cams[k][1].T @ cams[k][2]
         cy, sy = np.cos(yaw), np.sin(yaw)
@@ -372,15 +376,15 @@ def colours(fids, cams, sils, poses, ks, V, N):
             r = max(1, int(round(VOX * cams[k][0][0, 0] / np.median(z))))
             ok = (cos > 0.1) & vs.visible(q, z, img.shape[:2], r, 1.5 * VOX)
             u, v = np.round(q).astype(int).T
-            ok[ok] &= sils[k][0][v[ok], u[ok]]
+            ok[ok] &= sil[v[ok], u[ok]]
             score = cos / dist                                 # direct and near: the most pixels on the surface
-            upd = ok & (score > best[m])
-            if upd.any():
-                col[m, upd] = vs.bilinear(img, q[upd])           # the original pixels
-                best[m, upd] = score[upd]
-    own = best[0] >= 0
-    out = np.where(own[:, None], col[0], col[1])
-    seen = own | (best[1] >= 0)
+            if ok.any():
+                colour = np.zeros((len(V), 3))
+                colour[ok] = vs.bilinear(img, q[ok])            # the original pixels
+                vs.topk_update(S[m], Ck[m], score, colour, ok)
+    (c0, s0, b0), (c1, s1, b1) = vs.topk_medoid(S[0], Ck[0]), vs.topk_medoid(S[1], Ck[1])
+    out = np.where((b0 >= b1)[:, None], c0, c1)       # the better seen of the vertex and its mirror image
+    seen = s0 | s1
     if seen.any() and not seen.all():          # never seen (front and back of a side view): the nearest seen pixel
         from scipy.spatial import cKDTree
         out[~seen] = out[seen][cKDTree(V[seen]).query(V[~seen])[1]]
@@ -530,7 +534,7 @@ def reconstruct(tid, fids, cams, labels, camera_xy):
     # voxels of VOX_PX pixels at the object's range: finer near the camera, never finer than the image allows
     g = ground_point(cams[seed], *contact(*r))
     rng0 = float(np.linalg.norm(g[:2] - camera_xy)) if g is not None else 50.0
-    VOX = float(np.clip(VOX_PX * rng0 / cams[seed][0][0, 0], 0.02, 0.06))
+    VOX = float(np.clip(VOX_PX * rng0 / cams[seed][0][0, 0], VOX_MIN, 0.06))
     if TRACK == "label":      # given tracking: the labelled 2D box per frame replaces detection and tracking only
         sils = {}
         for k in sorted(lab):

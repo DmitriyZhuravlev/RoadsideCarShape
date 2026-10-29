@@ -1,6 +1,6 @@
 # Code of the article
 
-A snapshot of the parts of the research repository `3dseg` (commit `dec7965`) that the article uses: the reconstruction
+A snapshot of the parts of the research repository `3dseg` (commit `85785c2`) that the article uses: the reconstruction
 pipeline, its evaluation, the moving-camera variant and the dataset converter. Everything is classical (no learned
 models); LiDAR and labels are read for evaluation only.
 
@@ -11,7 +11,9 @@ models); LiDAR and labels are read for evaluation only.
 | Script | What it does |
 | :--- | :--- |
 | `whole_scene.py K...` | One window per reference frame K: segmentation, triangulation, joint solve of planar motion and per-vertex depth (Sect. 4.1). With `DUMP=1` it writes the window's cars to `docs/$DUMP_DIR/K.pkl`. |
-| `whole_scene_cars.py` | The whole video: per-car fusion of the dumped windows (car frame, ICP, symmetry, height field, visual hull) and the LiDAR evaluation (Sects. 4.2, 5). Results in `docs/whole_scene_cars$OUT_SUFFIX.json`. |
+| `whole_scene_cars.py` | The whole video: per-car fusion of the dumped windows (one rigid car per track via `car_ba.py`, symmetry, height field, visual hull, body-type priors where the length was never measured, regularised surface and Poisson surface via `spsr.py`) and the LiDAR evaluation (Sects. 4.2, 5). Results in `docs/whole_scene_cars$OUT_SUFFIX.json`; `BA_CACHE=<folder>` caches the track solves. |
+| `car_ba.py` | The track solve: all windows of a car together, one planar pose per frame shared by every window and the depths of all windows' vertices (needs windows dumped by the current `whole_scene.py`, which carry the field `ba`; older dumps fall back to the windows' own solves). |
+| `spsr.py` | Poisson surface reconstruction (plain, or screened with `alpha > 0`) on a regular grid, for the shown car models. |
 | `ego_sequence.py` | The moving-camera variant (`CAMERA=moving`): planar visual odometry and the ego-motion-compensated background. |
 | `vru_shape.py ID...` | Pedestrians, cyclists, motorcyclists: silhouettes, ground path, symmetric visual hull with a 0.6 m elliptic width prior, hold-out silhouette check; `TRACK=label` takes the labelled 2D boxes as the tracker. |
 | `coop_to_spd.py` | DAIR-V2X-C infrastructure side to the V2X-Seq-SPD layout; `--clips` splits it at breaks in the recording. |

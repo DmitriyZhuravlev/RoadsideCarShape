@@ -1,6 +1,6 @@
 \begin{table}[t]
 \centering
-\caption{Ablation on both intersections, changes added one at a time. IoU and height error against the gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors (m); on the cars evaluated in every row (17 on A, 6 on B). The pipeline is deterministic: repeated runs give identical numbers.}
+\caption{Ablation on both intersections, changes added one at a time. IoU and height error against the gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors (m); on the cars evaluated in every row (17 on A, 7 on B). The pipeline is deterministic: repeated runs give identical numbers.}
 \label{tab:ablation}
 \setlength{\tabcolsep}{3.5pt}
 \resizebox{\textwidth}{!}{%
@@ -10,12 +10,12 @@
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}
  & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ \\
 \midrule
-previous (cabin within body footprint) & 0.527 & 26.6 & 0.64 & 0.42 & 0.376 & 29.2 & 1.24 & 0.45 \\
-+ cabin unbounded & 0.561 & 27.5 & 0.63 & 0.45 & 0.362 & 30.8 & 1.82 & 0.43 \\
-+ density 0.40 $\to$ 0.25 & 0.562 & 27.1 & 0.63 & 0.45 & 0.367 & 30.8 & 1.82 & 0.44 \\
-+ height cap 1.9~m & 0.565 & 25.2 & 0.63 & 0.34 & 0.372 & 26.7 & 1.82 & 0.21 \\
-+ denser body mesh (ours) & \textbf{0.582} & 25.9 & 0.58 & 0.34 & \textbf{0.384} & 24.9 & 2.41 & 0.26 \\
-+ length bound 4.6~m (prior) & 0.596 & 26.8 & 0.35 & 0.33 & 0.489 & 25.5 & 0.31 & 0.21 \\
+previous version & 0.564 & 24.8 & 0.70 & 0.31 & 0.392 & 24.6 & 2.33 & 0.26 \\
++ cabin taper & 0.567 & 24.5 & 0.70 & 0.31 & 0.393 & 24.6 & 2.33 & 0.26 \\
++ length prior where never seen side-on & 0.580 & 24.5 & 0.48 & 0.31 & 0.486 & 26.3 & 0.29 & 0.21 \\
++ one rigid car per track & 0.599 & 23.1 & 0.45 & 0.32 & 0.524 & 26.4 & 0.25 & 0.16 \\
++ softer hull vote for those cars & 0.608 & 22.6 & 0.45 & 0.33 & 0.564 & 25.0 & 0.25 & 0.18 \\
++ body-type profile for them (ours) & \textbf{0.615} & 20.5 & 0.45 & 0.31 & \textbf{0.571} & 26.6 & 0.25 & 0.15 \\
 \bottomrule
 \end{tabular}}
 \end{table}

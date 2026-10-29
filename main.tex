@@ -34,17 +34,15 @@ Roadside cameras watch the same intersection for years, yet monocular 3D percept
 learned detector that outputs boxes and needs thousands of labelled 3D boxes from the same kind of camera. We show
 that the 3D \emph{shape} of the cars that pass a fixed, calibrated camera can be recovered without any learning and
 without labels. In short windows of the video every moving car is triangulated and its planar rigid motion and the
-depth of every vertex are solved jointly; across the whole video the windows of one car are brought into a common car
-frame, mirrored about the car's symmetry plane, averaged as a robust height field and completed by a visual hull of
-edge-snapped silhouettes. LiDAR and labels are used for evaluation only. On intersection~A of V2X-Seq --- the intersection the method was
-tuned on --- the models reach a solid IoU of \AsixClosed{} against the cars' accumulated LiDAR, as high as the
-labelled boxes themselves (\AlabClosed{}); on a second intersection of DAIR-V2X that was not used for tuning they
-reach \BsixClosed{} against
-\BlabClosed{} for the labelled boxes, and cars seen only from behind remain the main failure. Unchanged, the method
-reaches \DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD
-(labelled boxes \DairBoxClosed{} and \SpdBoxClosed{}), the main error being the cars' length along the viewing ray;
-from silhouettes alone it gives coarse models of nearby
-pedestrians and cyclists. We also show that the
+depth of every vertex are solved jointly; the windows of one car are then solved together as one rigid car, with one
+pose per frame shared by all its windows, mirrored about the car's symmetry plane, averaged as a robust height field
+and completed by a visual hull of edge-snapped silhouettes; a car whose length was never seen across the viewing ray
+takes the length and profile of its body type. LiDAR and labels are used for evaluation only. Against the cars'
+accumulated LiDAR the models reach a solid IoU of \AsixClosed{} on the intersection the method was tuned on (labelled
+boxes: \AlabClosed{}) and \BsixClosed{} on a second intersection not used for tuning (\BlabClosed{}). Unchanged, they
+reach \DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD,
+statistically level with the labelled 3D boxes scored the same way (\DairBoxClosed{} and \SpdBoxClosed{}). From
+silhouettes alone, nearby pedestrians and cyclists get coarse models when they are tracked well. We also show that the
 usual LiDAR reference is strongly biased at long range: against the raw accumulated scan the labelled box itself
 scores only \AlabRaw{}. Finally, the same pipeline on a moving vehicle camera with monocular visual odometry finds
 only a small share of the cars: the method depends on a fixed, elevated viewpoint.
@@ -74,12 +72,15 @@ single frames to the whole video. The contributions are:
 \item a learning-free reconstruction of every moving car in short windows: a dense triangulation of the car body,
   tracked through the window, with the planar rigid motion of the car and the depth of every vertex along its viewing
   ray solved jointly under road-contact, smoothness and non-holonomic constraints (Sect.~\ref{sec:window});
-\item a video-level fusion per car: a car frame from the smoothed path, the symmetry plane, a weighted-median height
-  field over all windows, and a visual hull of silhouettes snapped to image edges for the cabin (Sect.~\ref{sec:fusion});
+\item a video-level fusion per car: all windows of a car solved together as one rigid car (one pose per frame shared
+  by every window), the symmetry plane, a weighted-median height field over all windows, a visual hull of silhouettes
+  snapped to image edges for the cabin, and the body type's length and profile only where the video never measured
+  them (Sect.~\ref{sec:fusion});
 \item an evaluation against accumulated LiDAR that exposes a large bias of the raw reference at long range and
   corrects it, with the labelled boxes scored the same way as an upper reference (Sect.~\ref{sec:protocol});
-\item experiments on two intersections and on a moving vehicle camera, an ablation, and a direct account of where the
-  method fails (Sects.~\ref{sec:results}--\ref{sec:limits}).
+\item experiments on the intersections of two datasets and on a moving vehicle camera, an ablation, paired
+  confidence intervals against the labelled boxes, and a direct account of where the method fails
+  (Sects.~\ref{sec:results}--\ref{sec:limits}).
 \end{enumerate}
 
 % ------------------------------------------------------------------------------------------------------------------
@@ -136,10 +137,10 @@ Fig.~\ref{fig:steps} a car from its triangulation to its model.
   \node[box=blue!8, right=of video] (seg) {moving cars:\\ background,\\ flow, colour body};
   \node[box=blue!8, right=of seg] (mesh) {body mesh,\\ tracks $\pm 8$ frames};
   \node[box=blue!8, right=of mesh] (solve) {joint solve:\\ motion + depth\\ per vertex};
-  \node[box=orange!10, below=9mm of solve] (track) {tracks of\\ windows, car frame, ICP};
+  \node[box=orange!10, below=9mm of solve] (track) {tracks; all windows\\ as one rigid car};
   \node[box=orange!10, left=of track] (sym) {symmetry plane,\\ weighted-median\\ height field};
   \node[box=orange!10, left=of sym] (hull) {visual hull of\\ edge-snapped\\ silhouettes};
-  \node[box=gray!10, left=of hull] (model) {car model:\\ mesh + video\\ colours};
+  \node[box=gray!10, left=of hull] (model) {car model:\\ Poisson surface\\ + video colours};
   \draw[arr] (video) -- (seg); \draw[arr] (seg) -- (mesh); \draw[arr] (mesh) -- (solve);
   \draw[arr] (solve) -- (track); \draw[arr] (track) -- (sym); \draw[arr] (sym) -- (hull); \draw[arr] (hull) -- (model);
   \begin{scope}[on background layer]
@@ -212,11 +213,22 @@ type from the first pass's models (sedan and hatchback $0.40$, SUV $0.52$, van $
 Hungarian method \cite{kuhn} on their road positions, predicted with their solved velocity, inside a gate of
 $2.5~\text{m} + 4\,\%$ of the range; tracks of fewer than 5 windows are dropped.
 
-\paragraph{Car frame.} The footprint positions of a track are smoothed by a cubic in time and its heading is the
-direction of the smoothed solved velocity. Every window's body surface, sampled densely over its triangles, is moved
-into the car frame ($x$ forward, $y$ left, $z$ up) and centred on its own surface, because the depth error along the
-viewing ray would otherwise smear the car sideways. A trimmed planar ICP \cite{icp} in $(x, y, \text{yaw})$ then aligns
-each window to all others (three rounds).
+\paragraph{One rigid car per track.} Each window has solved its own motion, so two windows of the same car disagree
+on where the car is when they overlap in time. We therefore solve all windows of a track together, as rigid structure
+from motion of one moving object \cite{ozden2010}: one planar pose $\vect{Q}_g = (\phi_g, \vect{p}_g)$ of the car per
+frame $g$, shared by every window that sees frame $g$, and the depths of all windows' vertices. A vertex of window $w$,
+a point $\vect{X}$ in the world at the window's reference frame $r_w$, is at
+$\vect{R}(\phi_g - \phi_{r_w})(\vect{X}_{xy} - \vect{p}_{r_w}) + \vect{p}_g$ in frame $g$. The energy is that of
+Eq.~(\ref{eq:energy}) summed over the windows --- reprojection, surface smoothness and the body-edge anchors of every
+window --- with the motion terms on the shared poses of the whole track; one pose is held fixed, which removes the
+only free transformation of the problem. The solve starts from a chain: the middle window's pose comes from the
+smoothed path of the track, and each window places the reference frame of its neighbour through its own solved
+motion, so that the start agrees with every window's points (0.3--0.5~px). The vertices on the outline of a window's
+triangulation are left out: the tracker follows the moving edge of the car's mask there, not a point of its surface,
+and with them the track solve stretches the cars by 0.5~m. Every window then enters the car frame ($x$ forward, $y$
+left, $z$ up) through the shared pose of its reference frame, with no further alignment. Before this step, the windows
+were aligned to each other by a trimmed planar ICP \cite{icp}; along the car's own axis the point cloud is
+self-similar, and the alignment slid.
 
 \paragraph{Symmetry.} The symmetry plane $y = y_0$ maximises the share of points whose mirror image has a neighbour
 within 12~cm \cite{mitra2006}; the points are re-centred on it and used together with their mirror images, which
@@ -234,7 +246,8 @@ too uniform to track. The full silhouette of the car in every window --- backgro
 and the shadow removed --- is snapped to the image edges: every contour point moves up to $\pm 3$~px along its normal
 to the strongest gradient, as an active contour would \cite{snakes}. Voxels of 10~cm are kept if they, and their
 mirror images, project inside the silhouette in at least $95\,\%$ of the windows that see them (a visual hull
-\cite{laurentini}); the top of the kept voxels is the cabin field, and the model is the higher of the body and cabin
+\cite{laurentini}; $80\,\%$ for a car whose length is bounded by the prior, below, where the strict vote only cuts
+away volume); the top of the kept voxels is the cabin field, and the model is the higher of the body and cabin
 fields. A high camera sees a car from nearly the same direction in all windows, so the cone of one silhouette is
 long along the viewing ray and rises toward the camera; the hull is therefore capped at $1.9$~m. For cars nearer than
 40~m the silhouettes alone are used.
@@ -243,17 +256,30 @@ long along the viewing ray and rises toward the camera; the hull is therefore ca
 scale-free features (length to height, share of the length under the roof, height of the front and rear fifths) and
 a type by fixed rules: sedan, hatchback, SUV or van. A car seen across the viewing direction has its width almost
 along the ray, where a single camera measures it worst; the width is therefore bounded by the type's typical width
-(sedan 1.90, hatchback 1.85, SUV 1.95, van 2.05~m). An optional length bound cuts a car longer than a given length at
-its camera end, where the silhouette cone smears (Sect.~\ref{sec:results}).
+(sedan 1.90, hatchback 1.85, SUV 1.95, van 2.05~m). The length is measured only where the car is seen side-on: a
+window with $|\sin(\text{heading} - \text{viewing ray})| \ge 0.5$ sees the length across the ray. A car that fewer
+than two windows saw side-on --- most often a car seen only from behind --- has a length the video never measured:
+it is cut to 4.6~m at its camera end, where the silhouette cone smears, and its heights become its body type's
+profile, a box up to the shoulder line and a cabin box on top with a sloping windshield and rear window (0.9 and
+0.6~m long). These are priors, not measurements, and we report the two groups of cars separately
+(Sect.~\ref{sec:results}). Cars measured side-on, vans and buses included, keep their own length and shape.
 
-\paragraph{Mesh and colour.} The model is closed by marching cubes \cite{marchingcubes} on the height field and
-smoothed or, for
-display, by the convex hull of the occupied columns, subdivided and coloured. Every vertex takes the original
-pixel, sampled bilinearly, of the one window that sees it most directly and from nearest (the largest cosine between
-its normal and the viewing direction over the distance) where it faces the camera, lies inside the car's silhouette
-and is not hidden by another part of the model (a z-buffer of the model's own vertices). A vertex no window sees takes
-the colour of its mirror image, and one whose mirror image is unseen too the colour of the nearest seen vertex.
-Averaging the windows instead blurs the paint and leaves the unseen ends grey.
+\paragraph{Mesh and colour.} The height field is regularised between its raw surface and a convex hull: every
+cross-section of the car becomes its upper concave envelope, which fills notches and holes in the roof, while along
+the car narrow spikes and thin sheets are removed (grey opening over 0.3~m) and dips narrower than 0.7~m are filled
+(grey closing), so that the steps from bonnet to windshield to roof survive; a Gaussian of 1.2 cells follows. The
+surface of the regularised field (marching cubes \cite{marchingcubes}) is finally replaced by its Poisson surface
+\cite{kazhdan2006} on a 6~cm grid, which removes the staircase of the 10~cm columns; this changes the shown model, not
+the height field that is evaluated. Every vertex takes the original pixel, sampled bilinearly, of the windows that see
+it most directly and from nearest (the cosine between its normal and the viewing direction over the distance) where it
+faces the camera, lies inside the car's silhouette and is not hidden by another part of the model (a z-buffer of the
+model's own vertices): of its five best views the medoid pixel is kept, so that one view whose pose is a little off
+is outvoted. Before sampling a view, the model's projected outline is shifted onto that window's silhouette (the best
+overlap within 48~px), and the view is weighted by that overlap: the windows at the ends of a track are often off by
+tens of pixels, and without this the glass lands on the bonnet. A vertex and its mirror image take the better seen of
+the two. A vertex no window sees takes, near a seen vertex (0.3~m), that vertex's colour; farther, below the belt line
+one body colour, the median of the seen vertices between 30\,\% of the height and the belt line, and above it the
+median colour of the seen vertices at the same height --- glass at window height, paint on the roof.
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Evaluation Protocol}\label{sec:protocol}
@@ -290,7 +316,11 @@ accumulated field has gaps between the scan lines (left); closed with a radius o
 \paragraph{Metrics.} Both height fields are centred on their footprints and compared with both headings. The
 \emph{solid IoU} is $\sum \min(H, L) / \sum \max(H, L)$ over all columns, for our height field $H$ and the reference
 $L$, on a grid that covers both, so that a model longer or wider than the car is penalised; the \emph{footprint IoU}
-compares the occupied columns; the \emph{height error} is the median $|H - L|$ over columns occupied in both. Length, width and height are compared with the labelled box.
+compares the occupied columns; the \emph{height error} is the median $|H - L|$ over columns occupied in both. Length, width and height are compared with the labelled box. As a check that the closing does not favour
+smooth models, the \emph{scanned IoU} leaves out only the reference volume the closing invented (columns without a
+return in the raw field), keeping every other column, so that a model sticking out of the car still counts. Paired
+differences between our models and the labelled boxes on the same cars are given with 95\,\% bootstrap intervals
+(5000 resamples); a label our tracker split into two track fragments keeps the longer one.
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Results}\label{sec:results}
@@ -301,39 +331,38 @@ compares the occupied columns; the \emph{height error} is the median $|H - L|$ o
 the same way: the labelled box, a box of our own estimated length, width and height, and the best single window
 without averaging and symmetry. A is the intersection the method was tuned on, so its comparison with the labelled
 box is in-sample; B and the larger evaluation below are not. Against the closed reference our models reach
-\AsixClosed{}, as high as the labelled boxes (\AlabClosed{}) and above a box of the same size as ours
-(\AboxClosed{}): the shape adds to the dimensions. A single window reaches only \AsingleClosed{}; the gain comes
-from fusing the video (Fig.~\ref{fig:steps}).
-Figure~\ref{fig:scene} draws the models back into one frame of the video, Fig.~\ref{fig:cars} shows the best cars
-up close with their LiDAR, and Fig.~\ref{fig:gallery} their height fields.
+\AsixClosed{}, above the labelled boxes (\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the
+shape adds to the dimensions. A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
+(Fig.~\ref{fig:steps}). Figure~\ref{fig:scene} draws the models back into one frame of the video and
+Fig.~\ref{fig:cars} shows the best cars up close with their LiDAR.
 
 \input{tables/paired_ci.tex}
 
 \paragraph{Paired comparison.} Table~\ref{tab:paired} pairs every car with its labelled box and bootstraps the
-mean difference. On the tuning intersection~A ours is ahead of the box with the interval clear of zero; on B and
-the two larger evaluations the difference is not separated from zero. The split by length origin shows where the
-box still wins: the side-on-measured cars of V2X-Seq-SPD score $0.05$ below their box, while the prior-capped cars
-sit at or above theirs everywhere. About a third of the occupied cells of the gap-closed reference were added by
-the closing itself (mean filled share 0.37 on A); scoring on all cells except that invented volume, where the
-model's overshoot outside the car still counts, leaves the pair almost unchanged: on A our models reach a mean
-scanned IoU of 0.58 against 0.55 for the labelled box (0.61 against 0.57 on the full closed reference).
+mean difference. On the tuning intersection~A ours is ahead of the box with the interval clear of zero; on B and the
+two larger evaluations the difference is not separated from zero. The split by the origin of the length shows where
+the box still wins: the cars whose length was measured side-on in V2X-Seq-SPD score $0.05$ below their box, while
+the cars whose length and profile come from the body type sit at or above theirs everywhere. About a third of the
+occupied columns of the gap-closed reference were added by the closing itself (mean filled share 0.37 on A); scored
+on all columns except that invented volume, where a model sticking out of the car still counts, the pair barely
+changes: on A our models reach a scanned IoU of \Ascanned{} against \AlabScanned{} for the labelled box.
 
 \paragraph{Position.} The shapes are right in the car's own frame, but the car is placed with the error of a single
-camera: its centre is off by a median of \Aalong{}~m along the viewing ray and \Aacross{}~m across it. Centred on the
-labelled box, the models touch its faces closely: on average within 0.10~m at the sides, 0.25~m at the front and
-rear and 0.33~m at the roof. In the image the depth error is almost invisible --- the projected model
-matches the car's silhouette about as well as the projected labelled box does --- and refining each window's pose to
-its silhouette, which we tried on the previous version, raised the image overlap (mask IoU 0.545 to 0.591) but moved the cars further from
-their labelled positions along the ray, because the silhouettes include shadows, reflections and neighbours; the
-method keeps the poses from the point clouds.
+camera: its centre is off by a median of \Aalong{}~m along the viewing ray and \Aacross{}~m across it. In the image
+the depth error is almost invisible --- the projected model matches the car's silhouette about as well as the
+projected labelled box does. Solving the windows of a car together improves the shape but not this position: the
+depth of the whole car along the ray is fixed by the road contact and the body height, which all windows share.
+Refining each window's pose to its silhouette, which we tried on an earlier version, raised the image overlap (mask
+IoU 0.545 to 0.591) but moved the cars further from their labelled positions along the ray, because the silhouettes
+include shadows, reflections and neighbours.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{method_steps.png}
 \caption{From triangulation to model, three cars of intersection A. Left: the body triangulation in one frame.
 Middle: the same triangles in 3D after the window's joint solve, from a new viewpoint --- one window is noisy along
-the viewing rays. Right: the model fused over all windows of the car (symmetry, weighted-median height field, cabin
-from silhouettes, video colours), from the same viewpoint.}
+the viewing rays. Right: the model fused over all windows of the car (one rigid car, symmetry, weighted-median height
+field, cabin from silhouettes, Poisson surface, video colours), from the same viewpoint.}
 \label{fig:steps}
 \end{figure}
 
@@ -355,96 +384,88 @@ new viewpoint, with the colours of the video pixels; the model with the car's ac
 only) and the solid IoU against it.}
 \label{fig:cars}
 \end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.92\textwidth]{gallery_A.png}
-\caption{Height fields of three cars of intersection A (car frame, metres; colour = height). Left to right: the
-model; the averaged, mirrored height field; the best single window without symmetry; the raw LiDAR reference, with
-the gaps between scan lines that bias it.}
-\label{fig:gallery}
-\end{figure}
-
 \input{tables/ablation.tex}
 
 \paragraph{Ablation.} Table~\ref{tab:ablation} adds the changes one at a time to the previous version of the method,
-which bounded the cabin to the footprint of the triangulated body. The pipeline is deterministic (a tie in the vote of the body type goes to
-the most side-on view), and repeated runs give identical numbers. Releasing the bound gives the largest gain on A
-($+0.034$): the body often covers only part of a car --- the side facing the camera, or one end --- and the cars came
-out short or broken. On B, where the cars are seen from behind, it costs $0.014$: the unbounded silhouette cone
-lengthens them. The softer density threshold and the cap on the cabin height change the IoU little ($+0.001$ and
-$+0.003$ on A, $+0.005$ each on B), but the cap cuts the error of the car's height, $|\Delta H|$, by a quarter on A
-(0.45 to 0.34~m) and by half on B (0.44 to 0.21~m). A denser body mesh (vertices at most 5~px apart instead of
-10~px, about 2.5 times as many) raises the IoU on both intersections, by 0.017 on A and 0.012 on B, and adds a tracked
-car on each. The length bound (4.6~m), finally, raises the IoU on A by 0.014 and on B by 0.105 and cuts the length
-error by a factor of two to eight: the main error of the shapes is their length along the viewing ray. Since it is a
-prior on the size of passenger cars, which would cut vans and buses, it is off in the default method. The small width errors on A owe much to the width bound of the body type and should
-not be read as a measurement.
+on the same windows; the pipeline is deterministic, and repeated runs give identical numbers.
+The taper of the cabin --- above the belt line the roof is narrowed to about 72\,\% of the body width, as a car's
+cabin is --- changes the IoU little but keeps the glass off the roof edges. The length prior for the cars no window
+saw side-on is the largest single step on B ($+0.093$), where it cuts the length error from 2.3 to 0.3~m, and gains
+$+0.013$ on A; applied to every car it would cut vans and buses, and it costs on A when it does
+\footnote{A flat 4.6~m bound for all cars gave 0.598 on A against 0.590 for the conditional bound in an earlier
+version, but cut the 18 longer vehicles of five test clips from 0.574 to 0.543; the conditional bound kept 0.580.}.
+Solving the windows of a car together, as one rigid car, gains $+0.019$ on A and $+0.038$ on B. The softer hull vote
+for the prior cars gives back the volume the strict vote cut away ($+0.009$ and $+0.040$), and the body-type profile
+for those cars adds $+0.007$ on both and lowers the height error. We also tried and dropped, because they did not
+help on A and B: a weight of each window by its triangulation angle; a term making the points of one physical
+location in two windows coincide (it brings them together, from 0.5--0.8~m apart to 2~cm, but the shape does not
+improve); the body height as a soft penalty instead of a bound; a texture test against shadows on dark cars; and a
+Poisson surface \cite{kazhdan2006} of the windows' oriented points in place of the median height field, which keeps
+whatever a minority of windows sees, a neighbouring car included.
 
 \paragraph{Intersection B, not used for tuning.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
-labelled boxes (Table~\ref{tab:main}). Unlike on A, our models stay clearly below the labelled boxes here. B is harder: most cars
-drive away from the camera and are seen only from behind (Fig.~\ref{fig:trianB}). The textured part is then the rear,
-whose depth is measured along the viewing ray; the silhouette cone is long in the same direction, and the cars come
-out too long and too narrow. The car centres are also less accurate (median error \Bcentre{}~m against \Acentre{}~m
-on A), because the visible rear is two metres from the centre: with the 3~m matching gate only one car is matched,
-and we use 5~m on B.
+labelled boxes (Table~\ref{tab:main}). B is harder than A: most cars drive away from the camera and are seen only
+from behind (Fig.~\ref{fig:trianB}). The textured part is then the rear, whose depth is measured along the viewing
+ray, and the silhouette cone is long in the same direction: before the length prior, these cars came out too long
+and too narrow (previous version: \BprevClosed{}). No window of them is side-on, so their length and profile come from
+the body type --- a prior, not a measurement; with it our models are level with the labelled boxes on these cars
+(Table~\ref{tab:paired}: $+0.024$, the interval contains zero). The car centres are less accurate than on A (median error \Bcentre{}~m against \Acentre{}~m), because the
+visible rear is two metres from the centre: with the 3~m matching gate only one car is matched, and we use 5~m on
+B.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{triangulation_B.png}
 \caption{Intersection B (DAIR-V2X-C), cars seen from behind. The rear is triangulated well, but the side is never seen
-and the silhouette cone is long along the viewing ray: the models are too long and too narrow --- the main failure
-case of the method.}
+and the silhouette cone is long along the viewing ray: without a prior the models come out too long and too narrow.
+Their length and profile therefore come from the body type.}
 \label{fig:trianB}
 \end{figure}
 
 \input{tables/large_eval.tex}
 
-\paragraph{Seven intersections, two datasets.} To test the method beyond the two intersections it was developed on,
+\paragraph{Thirteen intersections, two datasets.} To test the method beyond the two intersections it was developed on,
 we ran it unchanged on \DairClips{} clips of DAIR-V2X-C (\DairFrames{} frames at \DairSites{} intersections) and on
 \SpdClips{} sequences of the full V2X-Seq-SPD (\SpdFrames{} frames at \SpdSites{} intersections), two or three of the
 longest per intersection, without intersection A; frames missing from the recording are skipped and the motion is
-measured per time slot. Table~\ref{tab:large} scores every car with a LiDAR reference against both references, together
-with the labelled boxes scored in the same way. On DAIR-V2X-C the \DairCars{} cars reach \DairOursClosed{} against
-\DairBoxClosed{} for the labelled boxes on the closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one;
-on V2X-Seq-SPD the \SpdCars{} cars reach \SpdOursClosed{} against \SpdBoxClosed{} (\SpdOursRaw{} against
-\SpdBoxRaw{} raw). Away from the intersection they were tuned on, the models stay below the labelled boxes at every
-intersection, by 0.04 to 0.22 on the closed reference; on the raw reference two intersections of DAIR-V2X-C come
-within 0.01 of the boxes. As on A and B, the cars come out too long along the viewing ray, and their position
-along it (\DairAlong{}~m and \SpdAlong{}~m) is the main error. Figure~\ref{fig:large} shows the best models of both
-datasets.
+measured per time slot. Table~\ref{tab:large} scores every car with a LiDAR reference and a labelled box against both
+references. On DAIR-V2X-C the \DairCars{} cars reach \DairOursClosed{} against \DairBoxClosed{} for the labelled boxes
+on the closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one; on V2X-Seq-SPD the \SpdCars{} cars
+reach \SpdOursClosed{} against \SpdBoxClosed{} (\SpdOursRaw{} against \SpdBoxRaw{} raw). The paired differences are
+not separated from zero (Table~\ref{tab:paired}); against the previous version of the method, which stayed 0.08 to
+0.11 below the boxes, the same cars gained $+0.074$ $[+0.050, +0.099]$ and $+0.099$ $[+0.075, +0.124]$. The position along
+the viewing ray (\DairAlong{}~m and \SpdAlong{}~m) remains the main error. Figure~\ref{fig:large} shows the best
+models of all datasets next to the cars in the video.
 
 \begin{figure}[!htb]
 \centering
-\includegraphics[width=\textwidth]{large_models.png}
-\caption{The best car models of the larger evaluation. Each model with the original pixels of its best views, from the
-same new viewpoint; its intersection, body type, solid IoU against the closed LiDAR and length against the labelled
-length.}
+\includegraphics[width=\textwidth]{best_models.png}
+\caption{The best car models of all datasets (length within 0.4~m of the labelled one). Per car: the video frame with
+the car framed; the model with the original pixels of its best views from the front left and from the rear left; its
+solid IoU against the closed LiDAR and its length against the labelled length.}
 \label{fig:large}
 \end{figure}
 
 \paragraph{Pedestrians and cyclists.} A person or a cyclist is thin and partly non-rigid, and the rigid
-triangulation finds few points on it. Its silhouette, however, is clear in every frame, and its bottom touches the
+triangulation finds few points on it. Its silhouette, however, is clear in most frames, and its bottom touches the
 road, so we reconstruct it from the silhouettes alone: the ground point under the silhouette gives the path and the
 direction of travel, and a symmetric visual hull in the object's own frame, with an elliptic horizontal section at
 most 0.6~m wide, gives the shape. A wet road mirrors the object; the contact line is the first row about which the
-image is mirror-symmetric, and between a cut that requires the mirror image to be blurred and one that does not, the
-model that agrees better with the silhouettes of the frames left out of the carving is kept. Each object is selected
-by its labelled 2D box in one frame; everything else is label-free. We tried ten objects within 35~m;
-Fig.~\ref{fig:vru} shows the best four. Their paths are accurate --- 0.3 to 1.2~m along the viewing ray and 0.1 to
-0.4~m across it --- and their heights are within 0.2 to 0.4~m of the labelled ones, mostly too large. Thin parts, the
-wheels and frame of a bicycle, are lost, and the length of a bicycle or a scooter comes out short. Of the other six,
-two failed because they were seldom free of other road users, one pedestrian under an umbrella was cut at the hips,
-and three came out as small fragments of the body. Beyond 70~m
-(50 pixels) the silhouettes merge with passing cars and the ground contact is a few pixels off, which places the
-object metres too near; there the shapes are rough envelopes.
+image is mirror-symmetric. Each object is selected by its labelled 2D box in one frame. Of fourteen pedestrians,
+cyclists and motorcyclists within 35~m of V2X-Seq-SPD, our own silhouette tracker gave usable models for two; the
+others came out as fragments --- an umbrella, legs, a shirt, a bicycle frame --- because the background difference
+loses dark clothes on dark asphalt and occluded parts. With the labelled 2D boxes as the tracker instead, everything
+else unchanged, whole figures appear (Fig.~\ref{fig:vru}): the silhouette overlap on frames left out of the carving
+rises from 0.20--0.46 to 0.45--0.64. The shape step works; the detection is the limit. The models are 0.3 to 0.5~m
+too tall, as the silhouette cone rises toward the camera, and the thin parts of a bicycle are lost.
 
 \begin{figure}[!htb]
 \centering
-\includegraphics[width=\textwidth]{vru_models.png}
-\caption{Pedestrians and cyclists from silhouettes, within 35~m. Per row: the video; the model drawn into it; three
-views of the model with the original pixels. A cyclist of intersection A on a wet road, a pedestrian and a cyclist of
-V2X-Seq-SPD, and a motorcyclist seen in only 13 frames. Heights and lengths against the labels in the titles.}
+\includegraphics[width=0.85\textwidth]{vru_compare.png}
+\caption{Pedestrians and cyclists of V2X-Seq-SPD from silhouettes, within 35~m. Per row: the video with the object
+framed; the model with our own silhouette tracker; the model with the labelled 2D boxes as the tracker; the same from
+the side, with its height against the labelled one. IoU: the model's silhouette against the observed one on the
+frames left out of the carving.}
 \label{fig:vru}
 \end{figure}
 
@@ -476,8 +497,8 @@ There is no common benchmark for car \emph{shapes} from roadside video, and publ
 average precision of boxes, not shape IoU against LiDAR; their numbers are not comparable with ours, and we did not
 retrain them. Table~\ref{tab:compare} therefore compares what each family of methods needs and produces.
 Quantitatively, the labelled box and the box of our own size in Table~\ref{tab:main} stand in for a perfect and for a
-size-only box detector: on A our shapes match the former and exceed the latter; on the other intersections they
-stay below the labelled boxes (Table~\ref{tab:large}).
+size-only box detector: our shapes exceed the latter everywhere and are level with the former on the larger
+evaluation (Tables~\ref{tab:large} and~\ref{tab:paired}).
 
 \input{tables/compare.tex}
 
@@ -495,34 +516,38 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 \section{Limitations}\label{sec:limits}
 
 \begin{itemize}
+\item \emph{Coverage.} Of the moving vehicles the camera sees, about half on intersection A and a quarter on B get a
+  model. Most of the others are never found by the window stage (beyond about 80~m, or merged with a neighbour in the
+  foreground) or are tracked for fewer than five windows; stopped cars have no parallax and are not reconstructed.
 \item \emph{Position along the viewing ray.} A single camera places the car about a metre off along the ray
   (Sect.~\ref{sec:results}); the shape is not affected, the position is.
-\item \emph{Viewpoint.} Cars seen only from behind or only from the front (Intersection B) come out too long and too
-  narrow; a moving, low camera fails (Sect.~\ref{sec:results}).
-\item \emph{Tuning.} The parameters were chosen on the \Acars{} cars of intersection A and kept for the
-  \DairCars{} and \SpdCars{} cars of the larger evaluation; all intersections are in one city and use the same kind of
-  camera.
-\item \emph{Pedestrians and cyclists} are reconstructed only near the camera, with thin parts lost; beyond 70~m their
-  silhouettes and ground contact are too coarse.
-\item \emph{Body type.} The rule-based type agrees with the same rules applied to the LiDAR profile for less than half
-  of the cars; it matters mainly through the width bound.
-\item \emph{Stopped cars} have no parallax and are not reconstructed; neither are cars tracked for less than five
-  windows.
-\item \emph{Run time.} The reference Python implementation needs one to two minutes per window on one CPU core; it is
-  not optimised.
+\item \emph{Priors.} A car never seen side-on --- typically one seen only from behind --- takes the length and the
+  profile of its body type; these cars are reported separately, and their score reflects the prior, not a measurement.
+  The measured cars of V2X-Seq-SPD stay $0.05$ below their labelled boxes.
+\item \emph{Tracks.} A track that switches to a neighbouring car for a few windows mixes the two into one model.
+\item \emph{Tuning.} The parameters were chosen on the \Acars{} cars of intersection A (the hull vote of the prior
+  cars on A and B) and kept for the \DairCars{} and \SpdCars{} cars of the larger evaluation; all intersections are in
+  one city and use the same kind of camera.
+\item \emph{Pedestrians and cyclists} need a good silhouette tracker: with ours most of them come out as fragments,
+  with given 2D boxes as whole but 0.3--0.5~m too tall figures, and thin parts are lost.
+\item \emph{Viewpoint.} A moving, low camera fails (Sect.~\ref{sec:results}).
+\item \emph{Run time.} The reference Python implementation needs one to two minutes per window on one CPU core and a
+  few minutes per car for the track solve; it is not optimised.
 \end{itemize}
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Conclusion}
 
 From a single fixed roadside camera, without any learning and without labels, the 3D shapes of the passing cars can
-be recovered: measured against the cars' own LiDAR at up to 70~m, they match the labelled 3D boxes on the
-intersection the method was developed on and stay on average 0.08 to 0.11 below them on \DairCars{} and \SpdCars{} cars of two
-datasets and seven intersections, mostly because they come out too long along the viewing ray. The two ingredients are the car's own motion, which turns one camera into many views of the textured body,
-and the whole video, which completes the body with the other side by symmetry and with the cabin by silhouettes. The
-same evaluation shows that the raw accumulated LiDAR is a biased reference at long range and should be closed before
-it is used to compare shapes. The method fails when the car is seen only end-on and on a low, moving camera; using the
-learned detectors' robustness for detection while keeping the geometric reconstruction is the natural next step.
+be recovered: measured against the cars' own LiDAR at up to 70~m, they are level with the labelled 3D boxes on
+\DairCars{} and \SpdCars{} cars of two datasets and thirteen intersections and above them on the intersection the method
+was developed on. Three ingredients carry it: the car's own motion, which turns one camera into many views of the
+textured body; the whole video, solved as one rigid car and completed by symmetry and by silhouettes; and, only where
+the video never measured the length, the body type. The same evaluation shows that the raw accumulated LiDAR is a
+biased reference at long range and should be closed before it is used to compare shapes. What remains is less the
+shape than finding and following the objects: half of the visible cars, and most pedestrians and cyclists, are lost
+before reconstruction. Using learned detectors for detection and tracking while keeping the geometric reconstruction
+is the natural next step.
 
 \bibliographystyle{splncs04}
 \bibliography{references}

@@ -97,6 +97,29 @@ def bilinear(img, q):
             + (1 - fx) * fy * im[y1, x0] + fx * fy * im[y1, x1])
 
 
+def topk_update(S, C, score, colour, ok):
+    """Keep per vertex the K best-scoring colour samples: S (N, K) scores (start at -inf), C (N, K, 3) colours; a new
+    sample (score (N,), colour (N, 3), valid where ok) replaces the vertex's weakest slot when it scores higher."""
+    slot = np.argmin(S, axis=1)
+    rows = np.nonzero(ok & (score > S[np.arange(len(S)), slot]))[0]
+    S[rows, slot[rows]] = score[rows]
+    C[rows, slot[rows]] = colour[rows]
+
+
+def topk_medoid(S, C):
+    """Per vertex the medoid of its valid samples (the one closest to their per-channel median: an original pixel,
+    not an average): a pixel that a geometry error took from another part of the car in one view is outvoted by
+    the views that agree. Returns (colour (N, 3), seen (N,), best score (N,))."""
+    valid = np.isfinite(S)
+    seen = valid.any(1)
+    Cv = np.where(valid[:, :, None], C, np.nan)
+    med = np.nanmedian(np.where(seen[:, None, None], Cv, 0.0), axis=1)
+    d = np.where(valid, np.linalg.norm(np.nan_to_num(Cv) - med[:, None, :], axis=2), np.inf)
+    colour = C[np.arange(len(S)), np.argmin(d, axis=1)]
+    colour[~seen] = 0.0
+    return colour, seen, np.where(seen, S.max(1), -np.inf)
+
+
 def carve_votes(axes, views, symmetric=True):
     """Share of the views (that see the voxel) whose silhouette contains it; views = (cam, centre, yaw, mask)."""
     X, Y, Z = np.meshgrid(*axes, indexing="ij")
