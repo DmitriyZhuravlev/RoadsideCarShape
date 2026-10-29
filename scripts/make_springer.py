@@ -37,6 +37,7 @@ PREAMBLE = r"""\documentclass[pdflatex,sn-aps,referee,lineno]{sn-jnl}% APS refer
 \usepackage{amsmath,amssymb,amsfonts}%
 \usepackage{xcolor}%
 \usepackage{booktabs}%
+\usepackage{array}%
 \usepackage{adjustbox}%
 \usepackage{tikz}%
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds}%

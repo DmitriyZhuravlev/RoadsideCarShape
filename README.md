@@ -11,11 +11,12 @@ Monocular 3D perception for roadside cameras is almost always a learned box dete
 every moving car is triangulated and its planar motion and the depth of every vertex are solved jointly; over the
 whole video the windows of one car are solved together as one rigid car, mirrored about its symmetry plane, averaged
 as a robust height field and completed by a visual hull of the silhouettes; a car whose length the video never
-measured takes its body type's length and profile. LiDAR and labels are used for evaluation only.
+measured takes its body type's length and profile. LiDAR and 3D labels are used for evaluation only (labelled 2D
+boxes serve once, as the tracker of a diagnostic experiment on pedestrians).
 
 | Data (cars with LiDAR) | ours, closed LiDAR | labelled box | ours, raw LiDAR | labelled box |
 | :--- | :---: | :---: | :---: | :---: |
-| V2X-Seq-SPD example, intersection A (19; tuning) | 0.617 | 0.572 | 0.403 | 0.376 |
+| V2X-Seq-SPD example, intersection A (19 tracks of 18 cars; tuning) | 0.617 | 0.572 | 0.403 | 0.376 |
 | DAIR-V2X-C example, intersection B (7) | 0.571 | 0.546 | 0.404 | 0.378 |
 | DAIR-V2X-C, 20 clips, 7 intersections (109) | 0.612 | 0.618 | 0.463 | 0.465 |
 | V2X-Seq-SPD, 12 sequences, 6 intersections (104) | 0.618 | 0.636 | 0.450 | 0.488 |
@@ -23,7 +24,9 @@ measured takes its body type's length and profile. LiDAR and labels are used for
 Mean solid IoU of the height fields against the cars' accumulated LiDAR (raw, and with the gaps between scan lines
 closed), the labelled boxes scored the same way on the same cars. On the two larger evaluations the paired difference
 to the labelled boxes is not separated from zero (-0.006 [-0.025, +0.012] and -0.018 [-0.041, +0.004], 95 %
-bootstrap intervals). The main remaining errors are the position along the viewing ray and the coverage: about half
+bootstrap intervals), also on the clips that informed no design choice (+0.001 [-0.021, +0.022] on 71 and
+-0.017 [-0.042, +0.009] on 94 cars); B and five of the clips informed three choices. The reference is the
+accumulated LiDAR completed by its mirror image. The main remaining errors are the position along the viewing ray and the coverage: about half
 of the visible moving cars get a model. Nearby pedestrians and cyclists are reconstructed from their silhouettes
 alone (coarse models; they need a good tracker).
 

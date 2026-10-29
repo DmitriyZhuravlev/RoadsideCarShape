@@ -40,7 +40,7 @@ def stats(run, labels=None):
     """Means over the evaluated cars, or over the cars of `labels` only (a label tracked twice counts twice)."""
     R = [x for x in rows(run) if labels is None or x["label"] in labels]
     m = lambda k: float(np.mean([x[k] for x in R]))
-    return {"n": len(R), "raw": m("fused: iou"), "closed": m("fused closed: iou"),
+    return {"n": len(R), "labels": len({x["label"] for x in R}), "raw": m("fused: iou"), "closed": m("fused closed: iou"),
             "scanned": m("fused closed: scanned_iou") if all("fused closed: scanned_iou" in x for x in R) else float("nan"),
             "median": float(np.median([x["fused closed: iou"] for x in R])),
             "foot": m("fused closed: footprint_iou"), "herr": m("fused closed: height_err_cm"),
@@ -68,7 +68,7 @@ def main():
         "BlabClosed": BOXES["B"]["label"][1], "BlabRaw": BOXES["B"]["label"][0],
         "AboxClosed": BOXES["A"]["own"][1], "BboxClosed": BOXES["B"]["own"][1],
         "AsingleClosed": A["single_closed"], "BsingleClosed": B["single_closed"],
-        "Acars": A["n"], "Bcars": B["n"], "AprevClosed": S["A0"]["closed"], "BprevClosed": S["B0"]["closed"],
+        "Acars": A["n"], "Bcars": B["n"], "Alabels": A["labels"], "Blabels": B["labels"], "AprevClosed": S["A0"]["closed"], "BprevClosed": S["B0"]["closed"],
         "Ascanned": A["scanned"], "AlabScanned": BOXES["A"]["label"][2],
         "Acentre": f"{A['centre']:.1f}", "Bcentre": f"{B['centre']:.1f}",
         "Aalong": f"{A['along']:.2f}", "Aacross": f"{A['across']:.2f}", "Balong": f"{B['along']:.1f}",
@@ -81,13 +81,15 @@ def main():
     lines = [r"\begin{table}[t]", r"\centering",
              r"\caption{Cars against their accumulated LiDAR (mean over the evaluated cars). IoU against the raw and the"
              r" gap-closed reference, footprint IoU and height error against the closed one, size errors against the"
-             r" labelled box. The labelled box and a box of our own estimated size are scored in the same way.}",
+             r" labelled box. The labelled box and a box of our own estimated size are scored in the same way. A car"
+             r" the tracker split into two tracks counts twice (Table~\ref{tab:paired} keeps its longer track).}",
              r"\label{tab:main}", r"\setlength{\tabcolsep}{4pt}",
              r"\resizebox{\textwidth}{!}{%", r"\begin{tabular}{llccccccc}", r"\toprule",
              r" & & \multicolumn{2}{c}{solid IoU} & footprint & height & \multicolumn{3}{c}{size error (m)} \\",
              r"\cmidrule(lr){3-4}\cmidrule(lr){7-9}",
              r" & & raw & closed & IoU & err.\ (cm) & $L$ & $W$ & $H$ \\", r"\midrule"]
-    for site, st, name in (("A", A, f"A ({A['n']} cars)"), ("B", B, f"B ({B['n']} cars)")):
+    count = lambda st: f"{st['n']} cars" if st["n"] == st["labels"] else f"{st['n']} tracks of {st['labels']} cars"
+    for site, st, name in (("A", A, f"A ({count(A)})"), ("B", B, f"B ({count(B)})")):
         bx = BOXES[site]
         lines += [rf"\multirow{{4}}{{*}}{{{name}}} & labelled box & {bx['label'][0]:.3f} & {bx['label'][1]:.3f} & "
                   rf"{bx['label'][3]:.3f} & -- & 0 & 0 & 0 \\",
@@ -111,7 +113,7 @@ def main():
              r" with the track solves recomputed from scratch, give identical numbers.}",
              r"\label{tab:ablation}", r"\setlength{\tabcolsep}{3.5pt}",
              r"\resizebox{\textwidth}{!}{%", r"\begin{tabular}{lcccccccc}", r"\toprule",
-             r" & \multicolumn{4}{c}{intersection A} & \multicolumn{4}{c}{B (not used for tuning)} \\",
+             r" & \multicolumn{4}{c}{intersection A} & \multicolumn{4}{c}{intersection B} \\",
              r"\cmidrule(lr){2-5}\cmidrule(lr){6-9}",
              r" & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ \\", r"\midrule"]
     for k, name in steps:

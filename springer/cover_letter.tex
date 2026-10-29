@@ -20,9 +20,10 @@ cars passing a fixed, calibrated camera can be recovered without any learning an
 of the video each moving car is triangulated, and its planar rigid motion and the depth of every vertex are solved
 jointly; over the whole video the windows of one car are solved together as one rigid car, mirrored about its
 symmetry plane, averaged as a robust height field and completed by a visual hull of edge-snapped silhouettes. LiDAR
-and labels are used for evaluation only. On 213 cars of two public datasets and thirteen intersections the models
+and 3D labels are used for evaluation only. On 213 cars of two public datasets and thirteen intersections the models
 reach a solid IoU of 0.61--0.62 against the cars' accumulated LiDAR, statistically level with the labelled 3D boxes
-scored the same way (0.62--0.64; paired bootstrap intervals contain zero). The evaluation also shows that the raw
+scored the same way (0.62--0.64; paired bootstrap intervals contain zero, also on the clips that informed no design
+choice). The evaluation also shows that the raw
 accumulated LiDAR is a strongly biased reference at long range, against which the labelled box scores only 0.38, and
 the manuscript reports its limits openly: about half of the visible cars are lost before reconstruction, pedestrians
 and cyclists need a good tracker, and on a moving vehicle camera the method finds only a small share of the cars.

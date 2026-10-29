@@ -25,6 +25,9 @@ RUNS = os.path.expanduser("~/Documents/MyArticles/dataset")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tables")
 N_BOOT, SEED = 5000, 0
 LARGE = [("DAIR-V2X-C", "dair_c_runs"), ("V2X-Seq-SPD", "spd_runs")]
+# clips of the larger evaluation that informed a choice during development (the conditional length cap was chosen
+# on A, B and these five; seq_0082 also checked the track solve): "held-out" leaves them out
+DEV_CLIPS = {"clip_52_1", "clip_106_0", "clip_21_0", "seq_0089", "seq_0082"}
 
 
 def boxes_site(site):
@@ -88,7 +91,7 @@ def large_rows(runs_dir):
             if r["label"] not in best or better > best[r["label"]][0]:   # track wins, never the score itself
                 best[r["label"]] = (better, {"ours": r["fused closed: iou"], "box": boxes[r["label"]],
                                               "n_side": r.get("n_side")})
-        rows += [b[1] for b in best.values()]
+        rows += [dict(b[1], clip=clip) for b in best.values()]
     return rows
 
 
@@ -100,14 +103,16 @@ def boot(rows):
     return len(d), float(d.mean()), float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
-GROUPS = ("all", "measured", "prior", "n/a")
+GROUPS = ("all", "measured", "prior", "n/a", "held-out")
 
 
 def grouped(rows):
-    """the rows in the four groups: measured n_side >= 2, prior n_side < 2, n/a without the key, and all together"""
+    """the rows in the five groups: measured n_side >= 2, prior n_side < 2, n/a without the key, all together, and
+    held-out: the larger evaluations' clips that informed no choice (rows of A and B carry no clip)"""
     has = [r for r in rows if r.get("n_side") is not None]
     return {"all": rows, "measured": [r for r in has if r["n_side"] >= 2], "prior": [r for r in has if r["n_side"] < 2],
-            "n/a": [r for r in rows if r.get("n_side") is None]}
+            "n/a": [r for r in rows if r.get("n_side") is None],
+            "held-out": [r for r in rows if r.get("clip") and r["clip"] not in DEV_CLIPS]}
 
 
 def main():
@@ -117,7 +122,9 @@ def main():
              r"\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR,"
              r" per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}:"
              r" the car's length was seen side-on ($\ge 2$ side-on windows, \texttt{n\_side} $\ge 2$); \emph{prior}:"
-             r" capped by the 4.6\,m length prior. Intersection A is the tuning set of the method.}",
+             r" capped by the 4.6\,m length prior; \emph{held-out}: without the five clips that informed a choice"
+             r" during development. Intersection A is the tuning set of the method; B informed three choices"
+             r" (Sect.~\ref{sec:protocol}).}",
              r"\label{tab:paired}", r"\small", r"\begin{tabular}{llrcl}", r"\toprule",
              r"Dataset & length & cars & mean $\Delta$ IoU & 95\,\% CI \\", r"\midrule"]
     for i, (name, rows) in enumerate(datasets):

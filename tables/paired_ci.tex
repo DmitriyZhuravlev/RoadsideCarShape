@@ -1,6 +1,6 @@
 \begin{table}[t]
 \centering
-\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}: the car's length was seen side-on ($\ge 2$ side-on windows, \texttt{n\_side} $\ge 2$); \emph{prior}: capped by the 4.6\,m length prior. Intersection A is the tuning set of the method.}
+\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}: the car's length was seen side-on ($\ge 2$ side-on windows, \texttt{n\_side} $\ge 2$); \emph{prior}: capped by the 4.6\,m length prior; \emph{held-out}: without the five clips that informed a choice during development. Intersection A is the tuning set of the method; B informed three choices (Sect.~\ref{sec:protocol}).}
 \label{tab:paired}
 \small
 \begin{tabular}{llrcl}
@@ -17,10 +17,12 @@ intersection B & all & 7 & +0.024 & [-0.023, +0.073] \\
 DAIR-V2X-C & all & 109 & -0.006 & [-0.025, +0.012] \\
  & measured & 74 & -0.016 & [-0.042, +0.008] \\
  & prior & 35 & +0.015 & [-0.011, +0.043] \\
+ & held-out & 71 & +0.001 & [-0.021, +0.022] \\
 \midrule
 V2X-Seq-SPD & all & 104 & -0.018 & [-0.041, +0.004] \\
  & measured & 66 & -0.051 & [-0.077, -0.027] \\
  & prior & 38 & +0.038 & [+0.000, +0.078] \\
+ & held-out & 94 & -0.017 & [-0.042, +0.009] \\
 \bottomrule
 \end{tabular}
 \end{table}
