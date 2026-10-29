@@ -107,8 +107,8 @@ def main():
     lines = [r"\begin{table}[t]", r"\centering",
              r"\caption{Ablation on both intersections, changes added one at a time. IoU and height error against the"
              rf" gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors (m); on the cars evaluated in every"
-             rf" row ({len(common['A'])} on A, {len(common['B'])} on B). The pipeline is deterministic: repeated runs"
-             r" give identical numbers.}",
+             rf" row ({len(common['A'])} on A, {len(common['B'])} on B). The pipeline is deterministic: repeated runs,"
+             r" with the track solves recomputed from scratch, give identical numbers.}",
              r"\label{tab:ablation}", r"\setlength{\tabcolsep}{3.5pt}",
              r"\resizebox{\textwidth}{!}{%", r"\begin{tabular}{lcccccccc}", r"\toprule",
              r" & \multicolumn{4}{c}{intersection A} & \multicolumn{4}{c}{B (not used for tuning)} \\",

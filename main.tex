@@ -387,7 +387,8 @@ only) and the solid IoU against it.}
 \input{tables/ablation.tex}
 
 \paragraph{Ablation.} Table~\ref{tab:ablation} adds the changes one at a time to the previous version of the method,
-on the same windows; the pipeline is deterministic, and repeated runs give identical numbers.
+on the same windows; the pipeline is deterministic, and repeated runs, with the track solves recomputed from
+scratch, give identical numbers.
 The taper of the cabin --- above the belt line the roof is narrowed to about 72\,\% of the body width, as a car's
 cabin is --- changes the IoU little but keeps the glass off the roof edges. The length prior for the cars no window
 saw side-on is the largest single step on B ($+0.093$), where it cuts the length error from 2.3 to 0.3~m, and gains
@@ -432,8 +433,9 @@ measured per time slot. Table~\ref{tab:large} scores every car with a LiDAR refe
 references. On DAIR-V2X-C the \DairCars{} cars reach \DairOursClosed{} against \DairBoxClosed{} for the labelled boxes
 on the closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one; on V2X-Seq-SPD the \SpdCars{} cars
 reach \SpdOursClosed{} against \SpdBoxClosed{} (\SpdOursRaw{} against \SpdBoxRaw{} raw). The paired differences are
-not separated from zero (Table~\ref{tab:paired}); against the previous version of the method, which stayed 0.08 to
-0.11 below the boxes, the same cars gained $+0.074$ $[+0.050, +0.099]$ and $+0.099$ $[+0.075, +0.124]$. The position along
+not separated from zero (Table~\ref{tab:paired}). The previous version of the method stayed 0.080 and 0.118 below
+the boxes on the same cars; the current one gains $+0.074$ $[+0.050, +0.099]$ and $+0.099$ $[+0.075, +0.124]$ over it.
+The position along
 the viewing ray (\DairAlong{}~m and \SpdAlong{}~m) remains the main error. Figure~\ref{fig:large} shows the best
 models of all datasets next to the cars in the video.
 
@@ -455,9 +457,11 @@ image is mirror-symmetric. Each object is selected by its labelled 2D box in one
 cyclists and motorcyclists within 35~m of V2X-Seq-SPD, our own silhouette tracker gave usable models for two; the
 others came out as fragments --- an umbrella, legs, a shirt, a bicycle frame --- because the background difference
 loses dark clothes on dark asphalt and occluded parts. With the labelled 2D boxes as the tracker instead, everything
-else unchanged, whole figures appear (Fig.~\ref{fig:vru}): the silhouette overlap on frames left out of the carving
-rises from 0.20--0.46 to 0.45--0.64. The shape step works; the detection is the limit. The models are 0.3 to 0.5~m
-too tall, as the silhouette cone rises toward the camera, and the thin parts of a bicycle are lost.
+else unchanged, eight of the fourteen give a model and six none: their silhouettes do not agree on one shape, or no
+frame shows them unoccluded. For the four in Fig.~\ref{fig:vru} whole figures appear, and the silhouette overlap on
+frames left out of the carving rises from 0.20--0.46 to 0.45--0.64; over all eight it spans 0.02--0.64. The shape
+step works where the object is followed whole; detection and tracking are the main limit. Three of the four figures
+are 0.4 to 0.5~m too tall, as the silhouette cone rises toward the camera, and the thin parts of a bicycle are lost.
 
 \begin{figure}[!htb]
 \centering
@@ -529,7 +533,8 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
   cars on A and B) and kept for the \DairCars{} and \SpdCars{} cars of the larger evaluation; all intersections are in
   one city and use the same kind of camera.
 \item \emph{Pedestrians and cyclists} need a good silhouette tracker: with ours most of them come out as fragments,
-  with given 2D boxes as whole but 0.3--0.5~m too tall figures, and thin parts are lost.
+  with given 2D boxes eight of fourteen give a model, mostly whole figures but up to 0.5~m too tall, and thin parts
+  are lost.
 \item \emph{Viewpoint.} A moving, low camera fails (Sect.~\ref{sec:results}).
 \item \emph{Run time.} The reference Python implementation needs one to two minutes per window on one CPU core and a
   few minutes per car for the track solve; it is not optimised.
