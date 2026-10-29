@@ -310,10 +310,13 @@ up close with their LiDAR, and Fig.~\ref{fig:gallery} their height fields.
 \input{tables/paired_ci.tex}
 
 \paragraph{Paired comparison.} Table~\ref{tab:paired} pairs every car with its labelled box and bootstraps the
-mean difference: on the tuning intersection~A the difference is not separated from zero, on B and the two larger
-evaluations it is, with the intervals of the table. About a third of the occupied cells of the gap-closed reference
-were added by the closing itself (mean filled share 0.37 on A), and on the cells the scanner actually returned our
-models score substantially higher (mean scanned IoU 0.75 against 0.60 overall on A).
+mean difference. On the tuning intersection~A ours is ahead of the box with the interval clear of zero; on B and
+the two larger evaluations the difference is not separated from zero. The split by length origin shows where the
+box still wins: the side-on-measured cars of V2X-Seq-SPD score $0.05$ below their box, while the prior-capped cars
+sit at or above theirs everywhere. About a third of the occupied cells of the gap-closed reference were added by
+the closing itself (mean filled share 0.37 on A); scoring on all cells except that invented volume, where the
+model's overshoot outside the car still counts, leaves the pair almost unchanged: on A our models reach a mean
+scanned IoU of 0.58 against 0.55 for the labelled box (0.61 against 0.57 on the full closed reference).
 
 \paragraph{Position.} The shapes are right in the car's own frame, but the car is placed with the error of a single
 camera: its centre is off by a median of \Aalong{}~m along the viewing ray and \Aacross{}~m across it. Centred on the

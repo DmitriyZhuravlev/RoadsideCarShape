@@ -3,7 +3,8 @@ length, width and height, each as a height field against the car's accumulated L
 
     V2X_SEQ_DIR=<sequence> python scripts/box_scores.py RESULTS_JSON      (e.g. docs/whole_scene_cars_abl_A5.json)
 
-Prints the means over the cars of RESULTS_JSON that have a LiDAR score: IoU raw, IoU closed, footprint IoU closed.
+Prints the means over the cars of RESULTS_JSON that have a LiDAR score: IoU raw, IoU closed, scanned IoU closed
+(the closed IoU over the cells the scanner actually returned; None when no car has one), footprint IoU closed.
 """
 import json
 import os
@@ -36,9 +37,11 @@ def main():
         for name, (L, W, H) in (("label", (r["label_length"], r["label_width"], r["label_height"])),
                                 ("own", (r["length"], r["width"], r["height"]))):
             b = box(xs, ys, L, W, H)
-            c = w.shape_scores(b, xs, ys, Lc, lx, ly)
-            out[name].append((w.shape_scores(b, xs, ys, Lt, lx, ly)["iou"], c["iou"], c["footprint_iou"]))
-    res = {k: [round(float(np.mean([t[i] for t in v])), 3) for i in range(3)] for k, v in out.items()}
+            c = w.shape_scores(b, xs, ys, Lc, lx, ly, Lt)
+            raw = w.shape_scores(b, xs, ys, Lt, lx, ly)
+            out[name].append((raw["iou"], c["iou"], c.get("scanned_iou"), c["footprint_iou"]))
+    res = {k: [round(float(np.mean([t[i] for t in v if t[i] is not None])), 3)
+               if any(t[i] is not None for t in v) else None for i in range(4)] for k, v in out.items()}
     print(json.dumps({"cars": len(rows), **res}))
 
 

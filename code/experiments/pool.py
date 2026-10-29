@@ -38,8 +38,9 @@ def box_scores(clip):
         box = np.where((np.abs(xs)[:, None] < r["label_length"] / 2) & (np.abs(ys)[None] < r["label_width"] / 2),
                        r["label_height"], 0.0)
         raw = w.shape_scores(box, xs, ys, Lt, lx, ly)
-        closed = w.shape_scores(box, xs, ys, w.close_lidar_holes(Lt, lx[1] - lx[0]), lx, ly)
-        out[str(r["track"])] = {"box: iou": raw["iou"], "box closed: iou": closed["iou"]}
+        closed = w.shape_scores(box, xs, ys, w.close_lidar_holes(Lt, lx[1] - lx[0]), lx, ly, Lt)  # scanned_iou too,
+        out[str(r["track"])] = {"box: iou": raw["iou"], "box closed: iou": closed["iou"],   # when the code has it
+                                **({"box closed: scanned_iou": closed["scanned_iou"]} if "scanned_iou" in closed else {})}
     json.dump(out, open(os.path.join(HERE, clip, "boxes.json"), "w"), indent=1)
 
 
