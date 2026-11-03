@@ -236,6 +236,17 @@ left, $z$ up) through the shared pose of its reference frame, with no further al
 were aligned to each other by a trimmed planar ICP \cite{icp}; along the car's own axis the point cloud is
 self-similar, and the alignment slid.
 
+\paragraph{Heading and the car's box.} The orientation of a car is never fitted to its shape; it comes from its
+motion. In a window, the yaw changes $\theta_j$ are unknowns of Eq.~(\ref{eq:energy}), started from a RANSAC
+Procrustes fit of the lowest vertices; the window's velocity is the solved translation per frame. Over the track,
+these velocities are smoothed by a quadratic in time, and the heading of each window is the direction of the smoothed
+velocity (the tangent of the smoothed path of the footprint where the car barely moves, below 5~cm per frame). This
+heading starts the track solve, whose pose $\vect{Q}_g = (\phi_g, \vect{p}_g)$ then gives the car's heading
+$\phi_g$ in every frame; the fifth term of Eq.~(\ref{eq:energy}) keeps it along the direction of travel. The car
+frame has its $x$ axis along $\phi_g$, and the model is built in it, so the car's bounding box is aligned with the
+heading: its length and width are the extents of the occupied height-field columns along $x$ and $y$, its height the
+98th percentile of the column heights. A car that turns is therefore boxed along its momentary direction of travel.
+
 \paragraph{Symmetry.} The symmetry plane $y = y_0$ maximises the share of points whose mirror image has a neighbour
 within 12~cm \cite{mitra2006}; the points are re-centred on it and used together with their mirror images, which
 gives the unseen side of the car. Points beyond the widest car ($\pm 1.05$~m) are dropped.
@@ -367,6 +378,9 @@ camera: its centre is off by a median of \Aalong{}~m along the viewing ray and \
 the depth error is almost invisible --- the projected model matches the car's silhouette about as well as the
 projected labelled box does. Solving the windows of a car together improves the shape but not this position: the
 depth of the whole car along the ray is fixed by the road contact and the body height, which all windows share.
+The heading from the motion is accurate: against the labelled yaw (modulo $180^\circ$, per car the median over its
+windows) the median error is $3.3^\circ$ on A and $0.9^\circ$ on B, $2.9^\circ$ and $2.5^\circ$ on the cars of
+DAIR-V2X-C and V2X-Seq-SPD, with 90\,\% of the cars within $5.8^\circ$, $1.5^\circ$, $8.0^\circ$ and $6.5^\circ$.
 Refining each window's pose to its silhouette, which we tried on an earlier version, raised the image overlap (mask
 IoU 0.545 to 0.591) but moved the cars further from their labelled positions along the ray, because the silhouettes
 include shadows, reflections and neighbours.
@@ -492,6 +506,58 @@ frames left out of the carving.}
 \label{fig:vru}
 \end{figure}
 
+With a good cuboid track and good masks the same carving gives a whole object. Fig.~\ref{fig:cyclist} shows a cyclist
+of V2X-Seq-SPD (seq.~59) carved from 61 masks, with the cuboid track fitted to the cyclist's own LiDAR points and the
+masks from a promptable segmenter (SAM~2.1) prompted by the labelled 2D box, as one example of how both can be
+obtained. Along the line of sight the silhouettes cannot measure depth; there the carve is bounded by the camera-side
+surface triangulated over the whole pass (rigid tracks, reprojection error at most 1~px) and mirrored about the
+centre plane. Its top comes from the silhouettes. The model is 1.60$\times$0.78$\times$1.56~m against the LiDAR box's
+1.63$\times$0.67$\times$1.50~m, solid IoU 0.64 against its accumulated LiDAR; the carve alone scores 0.64 too, with
+40\,\% more volume. For this example the camera is the rigid
+one that projects the road as the calibration does: the calibration's rotation of these sequences is not orthonormal
+(the row of the image's vertical has norm 0.83) and projects every height about 17\% short.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=\textwidth]{vru_cyclist.jpg}
+\caption{A cyclist of V2X-Seq-SPD carved from its masks and bounded by its triangulated surface. From the left: a frame of the video; its mask; the cuboid
+fitted to the cyclist's LiDAR; the model as the camera saw it, turned by 90$^\circ$ and from behind (the unseen side
+coloured by mirroring).}
+\label{fig:cyclist}
+\end{figure}
+
+\paragraph{Other vehicles and an uncalibrated camera.} Nothing in the window triangulation depends on the class of
+the vehicle. To test it on vehicles unlike the cars it was developed on, we ran it on a public street-camera video
+(1280$\times$720 pixels, 30 frames per second) of a column of tracked military vehicles, without calibration and
+without LiDAR. The camera comes from two vanishing points, the vertical of the building edges and the direction of the
+road given by the vehicles' ground tracks; their orthogonality gives the focal length (1494~px, principal point at
+the image centre), and the scale rests on an assumed camera height of 6~m. The vehicles are detected and tracked by
+an off-the-shelf instance segmenter and tracker (YOLO11 with ByteTrack), and their masks come from SAM~2.1 prompted
+by the tracked boxes. The windows are solved as in Sect.~\ref{sec:window} and aligned to each other by a trimmed
+planar ICP \cite{icp}, then refined per window against the silhouettes of the other windows; the shape is the
+symmetric visual hull in the vehicle's frame. Two steps are new. A tracked vehicle turns on the spot, so its axis is
+taken from the windows in which it drives straight (more than 5~cm per frame, less than $3^\circ$ of turn) rather
+than from the direction of travel; this turned one vehicle's model by $15^\circ$ and raised its silhouette overlap on
+frames left out of the carving from 0.82 to 0.84, and changed the others by less than $5^\circ$. And the visual hull of
+views that all come from one side and from above grows spurs and tapering ends on the unseen side; a morphological
+opening and a cut of the end slices whose section is below half the median remove them. Fig.~\ref{fig:best} shows
+the best frames of all object types, among them two vehicles in a three-quarter view. On frames left out of the
+carving the silhouette overlap is 0.86 for the rocket launcher and 0.83 for the tracked carrier. The carrier comes out
+8.7~m long, about 2~m longer than a vehicle of its type, because its ends are seen only from above and from one side;
+cutting them as for the launcher shortens it to 6.7~m but also cuts its front in the frames. A third vehicle, seen
+only head-on through smoke for 1.5~s, gave two usable windows and a box without detail.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{best_frames.jpg}
+\caption{The best frames of each object type: (a) a car of intersection A, (b) a van of intersection B, (c) a cyclist
+of V2X-Seq-SPD, with their calibrated cameras and LiDAR boxes; (d) and
+(e) a street-camera video of tracked military vehicles with an uncalibrated camera, whose scale rests on an assumed
+camera height of 6~m; (d) and (e) are three-quarter views. Per row: the frame; the model rendered into it, with the
+SAM mask outlined; the model from another view. IoU: the model's silhouette against the mask in the frame shown.}
+\label{fig:best}
+\end{figure}
+
 \paragraph{A moving camera.} To test the dependence on the fixed camera we ran the pipeline on the vehicle side of the
 same sequence. The camera's pose comes from monocular visual odometry: corners tracked frame to frame, the five-point
 essential matrix \cite{nister5pt} for the rotation and the direction of the step, and the step's length from the road
@@ -532,8 +598,9 @@ thousands of labelled boxes from comparable cameras and output no shape. Learned
 \cite{laurentini,spacecarving} need many, widely spread viewpoints; a single high camera gives a narrow range of
 directions per car, which is why our visual hull alone over-estimates the height and the length of cars seen end-on.
 Our method uses the motion of the car itself to obtain the views that a static multi-camera setup would provide, and
-uses the textured body for depth where silhouettes are ambiguous; it needs no training data, but it needs a fixed,
-calibrated camera and enough motion, and it reconstructs a car only after it has been tracked for about two seconds.
+uses the textured body for depth where silhouettes are ambiguous; it needs no training data, but it needs a fixed
+camera, calibrated or, with the scale from an assumed height, from vanishing points (Sect.~\ref{sec:results}), and
+enough motion, and it reconstructs a car only after it has been tracked for about two seconds.
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Limitations}\label{sec:limits}
