@@ -32,23 +32,23 @@
 
 \begin{abstract}
 Roadside cameras watch the same intersection for years, yet monocular 3D perception for them is almost always a
-learned detector that outputs boxes and needs thousands of labelled 3D boxes from the same kind of camera. We show
-that the 3D \emph{shape} of the cars that pass a fixed, calibrated camera can be recovered without any learning and
-without labels. In short windows of the video every moving car is triangulated and its planar rigid motion and the
-depth of every vertex are solved jointly; the windows of one car are then solved together as one rigid car, with one
-pose per frame shared by all its windows, mirrored about the car's symmetry plane, averaged as a robust height field
-and completed by a visual hull of edge-snapped silhouettes; a car whose length was never seen across the viewing ray
-takes the length and profile of its body type. LiDAR and 3D labels are used for evaluation only; labelled 2D boxes
-serve once, as the tracker of a diagnostic experiment on pedestrians. Against the cars' accumulated LiDAR, completed by
-its mirror image, the models reach a solid (height-field) IoU of \AsixClosed{} on the intersection on which the method
-was tuned (labelled boxes: \AlabClosed{}) and \BsixClosed{} on a second intersection (\BlabClosed{}). Unchanged, they
-reach \DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD,
-statistically level with the labelled 3D boxes scored the same way (\DairBoxClosed{} and \SpdBoxClosed{}), also on
-the clips that informed no design choice. From
-silhouettes alone, nearby pedestrians and cyclists get coarse models when they are tracked well. We also show that the
-usual LiDAR reference is strongly biased at long range: against the raw accumulated scan the labelled box itself
-scores only \AlabRaw{}. Finally, the same pipeline on a moving vehicle camera with monocular visual odometry finds
-only a small share of the cars: the method depends on a fixed, elevated viewpoint.
+learned detector that outputs boxes and needs thousands of labelled 3D boxes from the same kind of camera. We present
+a learning-free 3D triangulation of the objects that move past a fixed, calibrated, elevated camera. Its input is a
+mask and a 3D cuboid of each moving object per frame, from any source: background subtraction and optical-flow
+clustering, vanishing-point calibration with 3D vehicle boxes, or annotation. In short windows of the video the
+masked surface is triangulated and its planar rigid motion and the depth of every vertex are solved jointly, with the
+scale fixed by the cuboid. The windows of one object are then solved together as one rigid body, with one pose per
+frame, mirrored about its symmetry plane --- a car, a cyclist and, roughly, a pedestrian are symmetric --- averaged as
+a robust height field and completed by a visual hull of its masks. The elevated camera sees the roof and one side;
+the rest is completed from the symmetry and the cuboid. No step is learned; LiDAR and 3D labels are used for
+evaluation only. With precise masks and cuboids, the car models reach a solid (height-field) IoU of \AsixClosed{}
+against the cars' accumulated LiDAR, completed by its mirror image, on the intersection on which the method was tuned
+(labelled boxes: \AlabClosed{}) and \BsixClosed{} on a second intersection (\BlabClosed{}); unchanged, they reach
+\DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD
+(labelled boxes: \DairBoxClosed{} and \SpdBoxClosed{}). Pedestrians and cyclists are reconstructed by the same
+masks, cuboids and symmetry. We also show that the usual LiDAR reference is strongly biased at long range: against
+the raw accumulated scan the labelled box itself scores only \AlabRaw{}. Finally, on a moving vehicle camera the
+automatic front end finds only a small share of the cars: the method depends on a fixed, elevated viewpoint.
 \keywords{3D reconstruction \and vehicle shape \and roadside camera \and visual hull \and structure from motion \and
 learning-free}
 \end{abstract}
@@ -68,21 +68,27 @@ rigidly moving objects \cite{ozden2010} and of shape from silhouettes \cite{laur
 asks how far these classical tools go today for full car shapes at up to 70~m from the camera, and measures the
 answer against LiDAR.
 
-Our earlier work recovered 3D boxes from a single image with inverse perspective mapping (IPM) \cite{lift,efficient_orig}
-and segmented moving objects by optical-flow clustering \cite{moving_orig}. Here we go from boxes to shapes and from
-single frames to the whole video. The contributions are:
+The method takes, for every moving object, its mask and its 3D cuboid in each frame, and does not prescribe how
+they are obtained. Masks can come from background subtraction and the clustering of optical flow
+\cite{farneback,moving_orig}; cuboids from vanishing-point calibration and 3D vehicle boxes
+\cite{dubska_diamond_space,dubska2014,dubska2015,sochor} or from 2D detections lifted by inverse perspective mapping
+(IPM) \cite{lift,efficient_orig}; both from annotation. A cuboid gives position, size and heading, but not the shape;
+the method adds the 3D shape inside it, from the whole video and without learning. The contributions are:
 \begin{enumerate}
-\item a learning-free reconstruction of every moving car in short windows: a dense triangulation of the car body,
-  tracked through the window, with the planar rigid motion of the car and the depth of every vertex along its viewing
-  ray solved jointly under road-contact, smoothness and non-holonomic constraints (Sect.~\ref{sec:window});
-\item a video-level fusion per car: all windows of a car solved together as one rigid car (one pose per frame shared
-  by every window), the symmetry plane, a weighted-median height field over all windows, a visual hull of silhouettes
-  snapped to image edges for the cabin, and the body type's length and profile only where the video never measured
-  them (Sect.~\ref{sec:fusion});
+\item a learning-free 3D triangulation of moving objects from masks and cuboids: in short windows the masked surface
+  is triangulated and tracked, and the planar rigid motion of the object and the depth of every vertex along its
+  viewing ray are solved jointly under road-contact, smoothness and non-holonomic constraints, with the scale of each
+  window fixed by its cuboid (Sect.~\ref{sec:window});
+\item the completion of what one elevated camera never sees, from symmetry and the cuboid: all windows of an object
+  solved together as one rigid body (one pose per frame shared by every window), its symmetry plane, a weighted-median
+  height field over all windows, a visual hull of the masks under the cuboid's height, the roof from the masks' far
+  edge, and the cuboid-sized profile of the body type only for a car never seen from the side
+  (Sect.~\ref{sec:fusion}); only symmetry is assumed, so the same applies to cyclists and pedestrians;
 \item an evaluation against accumulated LiDAR that exposes a large bias of the raw reference at long range and
   corrects it, with the labelled boxes scored the same way as an upper reference (Sect.~\ref{sec:protocol});
-\item experiments on the intersections of two datasets and on a moving vehicle camera, an ablation, paired
-  confidence intervals against the labelled boxes, and a direct account of where the method fails
+\item experiments on cars, cyclists and pedestrians at the intersections of two datasets and on a moving vehicle
+  camera, an ablation, paired confidence intervals against the labelled boxes, and a direct account of where the
+  method fails
   (Sects.~\ref{sec:results}--\ref{sec:limits}).
 \end{enumerate}
 
@@ -95,8 +101,9 @@ others predict depth first \cite{pseudolidar,caddn} or lift image features to a 
 For roadside cameras, BEVHeight \cite{bevheight} regresses the height above the ground instead of depth, which suits
 the high viewpoint; Rope3D \cite{rope3d}, DAIR-V2X \cite{dairv2x} and V2X-Seq \cite{v2xseq} provide the benchmarks.
 All of these are trained with 3D boxes and output boxes. Classical traffic-camera work calibrates the camera from
-vanishing points \cite{dubska_diamond_space,sochor}, segments and tracks vehicles from motion \cite{kanhere} and lifts
-2D detections with IPM \cite{mallot,lift,efficient_orig}.
+the vanishing points of the traffic \cite{dubska_diamond_space,dubska2015} and builds 3D bounding boxes of the vehicles
+from them \cite{dubska2014,sochor}, segments and tracks vehicles from motion \cite{kanhere,moving_orig} and lifts 2D
+detections to 3D with IPM \cite{mallot,lift,efficient_orig}; any of these can supply the input of our method.
 
 \paragraph{Vehicle shape.} Learned category models fit a deformable car shape to a single image
 \cite{kar2015,deepmanta,rcnn3d} or to stereo street scenes \cite{engelmann2016}; they need a shape prior learned from
@@ -105,9 +112,9 @@ tracks \cite{ozden2010}, and dense methods reconstruct dynamic scenes from two f
 adjustment \cite{bundleadj} refines both. Shape from silhouettes bounds an object by the intersection of its viewing
 cones, the visual hull \cite{laurentini}, refined by photo-consistency in space carving \cite{spacecarving}.
 
-\paragraph{This work} combines these classical parts for a fixed roadside camera: motion and per-vertex depth for the
-visible body, silhouettes for the cabin, symmetry and the whole video for the hidden side, and no learned component
-anywhere in the reconstruction.
+\paragraph{This work} combines these classical parts for a fixed, elevated roadside camera: motion and per-vertex
+depth for the visible surface, the cuboid for the scale, masks for the cabin and the roof, symmetry, the cuboid and
+the whole video for the hidden side, and no learned component anywhere in the reconstruction.
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Setting}\label{sec:setting}
@@ -137,12 +144,12 @@ Fig.~\ref{fig:steps} a car from its triangulation to its model.
   box/.style={draw, rounded corners=2pt, align=center, minimum height=11mm, text width=24mm, fill=#1},
   box/.default=white, arr/.style={-{Stealth[length=2mm]}, thick}]
   \node[box=gray!10] (video) {video of a fixed,\\ calibrated camera};
-  \node[box=blue!8, right=of video] (seg) {moving cars:\\ background,\\ flow, colour body};
-  \node[box=blue!8, right=of seg] (mesh) {body mesh,\\ tracks $\pm 8$ frames};
-  \node[box=blue!8, right=of mesh] (solve) {joint solve:\\ motion + depth\\ per vertex};
-  \node[box=orange!10, below=9mm of solve] (track) {tracks; all windows\\ as one rigid car};
+  \node[box=blue!8, right=of video] (seg) {masks and\\ cuboids of moving\\ objects (any source)};
+  \node[box=blue!8, right=of seg] (mesh) {surface mesh,\\ tracks $\pm 8$ frames};
+  \node[box=blue!8, right=of mesh] (solve) {joint solve:\\ motion + depth\\ per vertex; scale\\ from the cuboid};
+  \node[box=orange!10, below=9mm of solve] (track) {tracks; all windows\\ as one rigid body};
   \node[box=orange!10, left=of track] (sym) {symmetry plane,\\ weighted-median\\ height field};
-  \node[box=orange!10, left=of sym] (hull) {visual hull of\\ edge-snapped\\ silhouettes};
+  \node[box=orange!10, left=of sym] (hull) {visual hull of the\\ masks, roof edge,\\ cuboid};
   \node[box=gray!10, left=of hull] (model) {car model:\\ Poisson surface\\ + video colours};
   \draw[arr] (video) -- (seg); \draw[arr] (seg) -- (mesh); \draw[arr] (mesh) -- (solve);
   \draw[arr] (solve) -- (track); \draw[arr] (track) -- (sym); \draw[arr] (sym) -- (hull); \draw[arr] (hull) -- (model);
@@ -151,8 +158,8 @@ Fig.~\ref{fig:steps} a car from its triangulation to its model.
     \node[draw=orange!60, dashed, rounded corners, fit=(track)(sym)(hull), inner sep=2.5mm, label={[font=\footnotesize]below:whole video, per car (Sect.~\ref{sec:fusion})}] {};
   \end{scope}
 \end{tikzpicture}}
-\caption{The pipeline. Every window of $\pm 8$ frames is reconstructed on its own (blue); the windows of one car are
-then fused over the whole video (orange). No step is learned; LiDAR and 3D labels are used only to evaluate.}
+\caption{The pipeline. Every window of $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
+are then fused over the whole video (orange). No step is learned; LiDAR and 3D labels are used only to evaluate.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -167,17 +174,25 @@ solved in 3D.}
 
 \subsection{One window: motion and depth of the visible body}\label{sec:window}
 
-\paragraph{Moving cars.} The background is the per-pixel median of the video. A frame's foreground blobs are cut at
-the contact line below which the wet road mirrors the car, split into separate cars by clustering the optical flow
-\cite{farneback,moving_orig}, and freed of the cast shadow by a brightness/saturation test. Blobs whose mean flow is
-below $1.5$~px per frame are stopped cars and are skipped: without motion there is no parallax.
+\paragraph{Input.} For every moving object the method takes its mask and its 3D cuboid (centre on the road, heading,
+length, width and height) in the frames that see it, linked into tracks. It does not prescribe their source. A fully
+automatic front end, which we use on the moving camera (Sect.~\ref{sec:results}), is the following. The background
+is the per-pixel median of the video. A frame's foreground blobs are cut at the contact line below which a wet road
+mirrors the car, split into separate objects by clustering the optical flow \cite{farneback,moving_orig}, and freed
+of the cast shadow by a brightness/saturation test; blobs whose mean flow is below $1.5$~px per frame are stopped and
+are skipped, as without motion there is no parallax. The blob's footprint on the road gives a cuboid by IPM
+\cite{lift,efficient_orig}; vanishing-point calibration gives one as well \cite{dubska2014,dubska2015}. To separate
+the errors of the triangulation from those of detection and tracking, the experiments and illustrations below use a
+more precise input\footnote{The masks come from a promptable segmenter, SAM~2.1 \cite{sam2}, prompted by the
+labelled 2D boxes of the dataset; the cuboids are fitted to each object's LiDAR points in the frames with a scan and
+interpolated in between. This input is thus based on annotation; the method itself uses only the masks and the
+cuboids, as described in this section.}.
 
-\paragraph{The body and its mesh.} Inside each blob the pixels are clustered by colour ($k$-means with $k = 3$
-in CIE Lab); the largest cluster and the clusters within $\Delta E \le 20$ of it form the \emph{body}: the painted
-metal without tyres, dark trims and shadow, whose texture moves rigidly with the car. The body receives a dense set of vertices --- Shi--Tomasi corners
-\cite{shitomasi}, a regular grid of at most 5~px (at least 400 vertices per body) and points 2~px inside its
-outline --- and is triangulated by
-Delaunay. Every vertex is tracked through the window of $\pm 8$ frames with pyramidal Lucas--Kanade \cite{lucas_kanade}
+\paragraph{The surface and its mesh.} The mask of the reference frame receives a dense set of vertices ---
+Shi--Tomasi corners \cite{shitomasi}, a regular grid of at most 5~px (at least 400 vertices per object) and points
+2~px inside its outline --- and is triangulated by Delaunay. (With the automatic front end, whose blobs include
+shadow and blur, only the \emph{body} is meshed: the blob's pixels clustered by colour, $k$-means with $k = 3$ in CIE
+Lab, the largest cluster and the clusters within $\Delta E \le 20$ of it.) Every vertex is tracked through the window of $\pm 8$ frames with pyramidal Lucas--Kanade \cite{lucas_kanade}
 and a forward--backward check; long tracks of near, fast cars are cut at 100~px of image motion.
 
 \paragraph{Joint solve.} The unknowns are the motion $\vect{m}_j = (\theta_j, \vect{t}_j)$ of the car in every frame
@@ -213,11 +228,20 @@ or another car --- are removed and the solve is repeated (two rounds).
 The body height $h_r$ is $0.45$~m in a first pass over the video; the second pass uses the value of each car's body
 type from the first pass's models (sedan and hatchback $0.40$, SUV $0.52$, van $0.48$~m).
 
+\paragraph{Scale from the cuboid.} A fixed camera sees a window and the same window scaled about the camera centre
+identically in every frame, since the motion and the depths scale alike: the images fix the shape, not the scale. The
+road anchor guesses the scale, but at 60--70~m a few per cent of scale move the object by metres. The window is
+therefore scaled about the camera centre by the factor in $[0.8, 1.2]$ that puts the most vertices inside its cuboid
+(with a margin of 15~cm), and vertices more than 1.0~m beyond the cuboid along the object and 0.8~m across it, or
+outside the mask in the reference frame, are dropped as depth outliers along the ray. The cuboid fixes where the
+object is and how large; its shape still comes from the triangulation.
+
 \subsection{The whole video: one model per car}\label{sec:fusion}
 
-\paragraph{Tracks.} Windows are reconstructed every second frame. The cars of successive windows are linked by the
-Hungarian method \cite{kuhn} on their road positions, predicted with their solved velocity, inside a gate of
-$2.5~\text{m} + 4\,\%$ of the range; tracks of fewer than 5 windows are dropped.
+\paragraph{Tracks.} A window is reconstructed at every frame of a track. The windows of one object are linked by the
+track identities of the input; without them (the automatic front end, a window every second frame) the objects of
+successive windows are linked by the Hungarian method \cite{kuhn} on their road positions, predicted with their solved
+velocity, inside a gate of $2.5~\text{m} + 4\,\%$ of the range. Tracks of fewer than 5 windows are dropped.
 
 \paragraph{One rigid car per track.} Each window has solved its own motion, so two windows of the same car disagree
 on where the car is when they overlap in time. We therefore solve all windows of a track together, as rigid structure
@@ -258,27 +282,37 @@ windows must see a column. Columns whose point density is below $25\,\%$ of the 
 cross-section are dropped: the true surface collects points from every window, the along-ray depth noise spreads
 them thin. A $3 \times 3$ median filter and the largest connected component finish the field.
 
-\paragraph{Cabin from silhouettes.} The body field covers the painted body; windows and roof are often too dark or
-too uniform to track. The full silhouette of the car in every window --- background subtraction with the reflection
-and the shadow removed --- is snapped to the image edges: every contour point moves up to $\pm 3$~px along its normal
-to the strongest gradient, as an active contour would \cite{snakes}. Voxels of 10~cm are kept if they, and their
-mirror images, project inside the silhouette in at least $95\,\%$ of the windows that see them (a visual hull
-\cite{laurentini}; $80\,\%$ for a car whose length is bounded by the prior, below, where the strict vote only cuts
-away volume); the top of the kept voxels is the cabin field, and the model is the higher of the body and cabin
-fields. A high camera sees a car from nearly the same direction in all windows, so the cone of one silhouette is
-long along the viewing ray and rises toward the camera; the hull is therefore capped at $1.9$~m. For cars nearer than
-40~m the silhouettes alone are used.
+\paragraph{Cabin from the masks.} The triangulated field covers the textured surface; windows and roof are often too
+dark or too uniform to track. The silhouette of the object in every window is its mask. Voxels of 10~cm are kept if
+they, and their mirror images, project inside the mask in at least $75\,\%$ of the windows that see them (a visual
+hull \cite{laurentini}); the top of the kept voxels is the cabin field, and the model is the higher of the
+triangulated and cabin fields. A high camera sees a car from nearly the same direction in all windows, so the cone of
+one silhouette is long along the viewing ray and rises toward the camera; the hull is therefore capped at the
+cuboid's height plus 0.4~m. For objects nearer than 40~m the silhouettes alone are used. (The automatic silhouettes,
+background subtraction with the reflection and the shadow removed, are first snapped to the image edges: every
+contour point moves up to $\pm 3$~px along its normal to the strongest gradient, as an active contour would
+\cite{snakes}; they vote with $95\,\%$, and the hull is capped at 1.9~m.)
+
+\paragraph{Roof from the far edge.} The camera is above the car, so the top edge of a silhouette is the \emph{far}
+edge of the roof, and the visual hull lets the near half of the roof rise by about $\tfrac{W}{2}\tan\epsilon$ above
+it, for the width $W$ and the camera's elevation angle $\epsilon$. The roof height $r(x)$ at each position $x$ along
+the car is therefore measured where it is seen: in every frame, the vertical segment at $x$ on the far side of the
+car (at $40\,\%$ of the cuboid's width off the symmetry plane) is projected, and $r(x)$ is the height at which it
+leaves the mask through its top edge. The median over the frames (at least three) caps the height field.
 
 \paragraph{Body type, width and length.} The side profile of the car's silhouette in its most side-on windows gives
 scale-free features (length to height, share of the length under the roof, height of the front and rear fifths) and
 a type by fixed rules: sedan, hatchback, SUV or van. For a car seen from the side the width lies nearly along the viewing ray, where a single camera measures it worst; the width is therefore bounded by the type's typical width
 (sedan 1.90, hatchback 1.85, SUV 1.95, van 2.05~m). The length is measured only where the car is seen side-on: a
 window with $|\sin(\text{heading} - \text{viewing ray})| \ge 0.5$ sees the length across the ray. A car seen side-on in
-fewer than two windows --- most often a car seen only from behind --- has a length the video never measured:
-it is cut to 4.6~m at its camera end, where the silhouette cone smears, and its heights become its body type's
-profile, a box up to the shoulder line and a cabin box on top with a sloping windshield and rear window (0.9 and
-0.6~m long). These are priors, not measurements, and we report the two groups of cars separately
-(Sect.~\ref{sec:results}). Cars measured side-on, vans included, keep their own length and shape.
+fewer than two windows --- most often a car seen only from behind --- has a length and a profile the video never
+measured, only a silhouette cone that is long along the ray. It is completed from its cuboid: the footprint of the
+cuboid's length and width about the middle of the cone and the symmetry plane, and the profile of its body type
+scaled to the cuboid's height, a box up to the shoulder line and a cabin box on top with a sloping windshield and
+rear window (0.9 and 0.6~m long). This is completion, not measurement, and we report the two groups of cars
+separately (Sect.~\ref{sec:results}). Cars measured side-on, vans included, keep their own length and shape. (Without
+a cuboid, such a car is cut to 4.6~m at its camera end, where the silhouette cone smears, and takes the type's
+profile.)
 
 \paragraph{Mesh and colour.} The height field is regularised between its raw surface and a convex hull: every
 cross-section of the car becomes its upper concave envelope, which fills notches and holes in the roof, while along
@@ -306,7 +340,9 @@ median colour of the seen vertices at the same height --- glass at window height
 wet road). \emph{Intersection B} is the infrastructure side of the DAIR-V2X-C example \cite{dairv2x} (84 frames at
 12.5~Hz, camera 8.96~m high, dry road); its labels have no track identities, so we link the labelled boxes from frame
 to frame (for evaluation only). \emph{The moving camera} is the vehicle side of the same V2X-Seq sequence (250 frames,
-camera 1.7~m above the road). The parameters were chosen on intersection A, but B and five clips of the larger
+camera 1.7~m above the road). Every car of the intersections and of the larger evaluation is reconstructed from the
+precise masks and cuboids of Sect.~\ref{sec:window}; the moving camera uses the automatic front end. The parameters
+were chosen on intersection A, but B and five clips of the larger
 evaluation (Sect.~\ref{sec:results}) informed three design choices: the length cap only for cars never seen side-on,
 rather than for every car, was chosen on A, B and those five clips; the softer hull vote for those cars was chosen on A and B;
 and the joint solve of a track was adopted after it improved A, B and one of the five clips. Ideas that did not help
