@@ -68,8 +68,8 @@ rigidly moving objects \cite{ozden2010} and of shape from silhouettes \cite{laur
 asks how far these classical tools go today for full car shapes at up to 70~m from the camera, and measures the
 answer against LiDAR.
 
-Our earlier work recovered 3D boxes from a single image with inverse perspective mapping (IPM) \cite{lift,efficient_orig}.
-Here we go from boxes to shapes and from
+Our earlier work recovered 3D boxes from a single image with inverse perspective mapping (IPM) \cite{lift,efficient_orig}
+and segmented moving objects by optical-flow clustering \cite{moving_orig}. Here we go from boxes to shapes and from
 single frames to the whole video. The contributions are:
 \begin{enumerate}
 \item a learning-free reconstruction of every moving car in short windows: a dense triangulation of the car body,
@@ -169,7 +169,7 @@ solved in 3D.}
 
 \paragraph{Moving cars.} The background is the per-pixel median of the video. A frame's foreground blobs are cut at
 the contact line below which the wet road mirrors the car, split into separate cars by clustering the optical flow
-\cite{farneback}, and freed of the cast shadow by a brightness/saturation test. Blobs whose mean flow is
+\cite{farneback,moving_orig}, and freed of the cast shadow by a brightness/saturation test. Blobs whose mean flow is
 below $1.5$~px per frame are stopped cars and are skipped: without motion there is no parallax.
 
 \paragraph{The body and its mesh.} Inside each blob the pixels are clustered by colour ($k$-means with $k = 3$
