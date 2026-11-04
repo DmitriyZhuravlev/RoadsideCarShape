@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/code/3dseg"))
 os.chdir(os.path.expanduser("~/Documents/MyArticles/code/3dseg"))
 import whole_scene_cars as w
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures", "models_A.pkl")
+OUT = os.environ.get("MODELS_PKL") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures",
+                                                   "models_A.pkl")
 for fn in ("types_figure", "gallery", "triangulation_figure", "scene_video"):
     setattr(w, fn, lambda *a, **k: None)
 

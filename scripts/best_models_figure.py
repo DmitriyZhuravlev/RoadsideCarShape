@@ -4,9 +4,16 @@ import cv2, numpy as np
 sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/scripts"))
 import cars_figure as cf
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
-PICK = [("V2X-Seq-SPD", "all_seq_0059", "003932"), ("DAIR-V2X-C", "all_clip_106_0", "000073"), ("Intersection A", "slope2_A", "003976"),
-        ("DAIR-V2X-C", "all_clip_105_0", "000198"), ("V2X-Seq-SPD", "all_seq_0002", "001528"), ("DAIR-V2X-C", "all_clip_21_0", "000023"),
-        ("DAIR-V2X-C", "all_clip_52_1", "000029"), ("DAIR-V2X-C", "all_clip_45_0", "000050")]
+# (dataset, run of the model on the precise annotation scored against the labels, label, run whose video photos frame
+# the car: the photo is the video, the same for any annotation)
+PICK = [("V2X-Seq-SPD", "ann_P_seq_0059_003932_lb0", "003932", "all_seq_0059"),
+        ("DAIR-V2X-C", "ann_P_clip_106_0_000073_lb0", "000073", "all_clip_106_0"),
+        ("Intersection A", "ann_Aall1_lb0", "003976", "slope2_A"),
+        ("DAIR-V2X-C", "ann_P_clip_105_0_000198_lb0", "000198", "all_clip_105_0"),
+        ("V2X-Seq-SPD", "ann_P_seq_0002_001528_lb0", "001528", "all_seq_0002"),
+        ("DAIR-V2X-C", "ann_P_clip_21_0_000023_lb0", "000023", "all_clip_21_0"),
+        ("DAIR-V2X-C", "ann_P_clip_52_1_000029_lb0", "000029", "all_clip_52_1"),
+        ("DAIR-V2X-C", "ann_P_clip_45_0_000050_lb0", "000050", "all_clip_45_0")]
 W, H = 400, 270
 def tile(m, eye, title):
     V, F = np.array(m["v"]).reshape(-1, 3), np.array(m["f"]).reshape(-1, 3)
@@ -20,11 +27,13 @@ def photo(ph, title):
     can[y0:y0 + img.shape[0], x0:x0 + img.shape[1]] = img
     return cf.panel(can, title, size=(W, H))
 rows = []
-for name, run, lab in PICK:
-    r = max((x for x in json.load(open(f"{D}/whole_scene_cars_{run}.json")) if x.get("label") == lab and "fused closed: iou" in x),
-            key=lambda x: x["fused closed: iou"])          # a label can be split over two track fragments
+def row_of(run, lab):
+    return max((x for x in json.load(open(f"{D}/whole_scene_cars_{run}.json")) if x.get("label") == lab and "fused closed: iou" in x),
+               key=lambda x: x["fused closed: iou"])       # a label can be split over two track fragments
+for name, run, lab, prun in PICK:
+    r = row_of(run, lab)
     m = json.load(open(f"{D}/cars_viewer_{run}/meshes.json"))[f"track {r['track']}"]
-    rows.append(np.hstack([photo(f"{D}/photos_{run}/track_{r['track']}.jpg", f"{name}: video"),
+    rows.append(np.hstack([photo(f"{D}/photos_{prun}/track_{row_of(prun, lab)['track']}.jpg", f"{name}: video"),
                            tile(m, np.array([7.8, 8.4, 4.6]), f"model ({r['body_type']}), IoU {r['fused closed: iou']:.2f}"),
                            tile(m, np.array([-7.5, 8.6, 3.8]), f"length {r['length']:.1f} m (label {r['label_length']:.1f} m)")]))
 two = [np.hstack([rows[i], np.full((rows[i].shape[0], 16, 3), 255, np.uint8), rows[i + 1]]) for i in range(0, len(rows), 2)]

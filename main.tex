@@ -159,9 +159,9 @@ then fused over the whole video (orange). No step is learned; LiDAR and 3D label
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{window.jpg}
-\caption{One frame of intersection~A. Left: the moving cars found by background subtraction and optical flow, their
-body coloured. Right: the triangulation of the frame (grey: static, laid flat on the road; colour: the bodies of the
-moving cars, solved in 3D).}
+\caption{One frame of intersection~A. Top: the moving cars' SAM masks (white outline) and their LiDAR-fitted
+cuboids. Bottom: the body triangulation of every window whose reference frame this is, one colour per car, each
+solved in 3D.}
 \label{fig:overview}
 \end{figure}
 
@@ -398,7 +398,7 @@ field, cabin from silhouettes, Poisson surface, video colours), from the same vi
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{scene_models.jpg}
-\caption{Intersection A, frame 57, about 60--70~m from the camera. Top: the video. Bottom: the four car models,
+\caption{Intersection A, frame 30, about 60--70~m from the camera. Top: the video. Bottom: the four car models,
 fused over the whole video, drawn at their pose in this frame (all models whose projection matches the car's
 silhouette in this frame).}
 \label{fig:scene}
@@ -407,7 +407,7 @@ silhouette in this frame).}
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{cars_best.png}
-\caption{Four best-reconstructed cars of intersection A. A van, an SUV and two sedans, each shown in the frame
+\caption{Four best-reconstructed cars of intersection A. A van, a hatchback and two sedans, each shown in the frame
 where it is largest and unoccluded. Left to right: the video; our model drawn into the same frame; the model from a
 new viewpoint, with the colours of the video pixels; the model with the car's accumulated LiDAR (red, evaluation
 only) and the solid IoU against it.}
@@ -469,13 +469,13 @@ not separated from zero (Table~\ref{tab:paired}), also on the clips that informe
 DAIR-V2X-C, $+0.001$ $[-0.021, +0.022]$; 94 of V2X-Seq-SPD, $-0.017$ $[-0.042, +0.009]$). The previous version of the method was 0.080 and 0.118 below
 the boxes on the same cars; the current one gains $+0.074$ $[+0.050, +0.099]$ and $+0.099$ $[+0.075, +0.124]$ over it.
 The position along
-the viewing ray (\DairAlong{}~m and \SpdAlong{}~m) remains the main error. Figure~\ref{fig:large} shows the best
+the viewing ray (\DairAlong{}~m and \SpdAlong{}~m) remains the main error. Figure~\ref{fig:large} shows eight car
 models of all datasets next to the cars in the video.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=\textwidth]{best_models.png}
-\caption{The best car models of all datasets (length within 0.4~m of the labelled one). Per car: the video frame with
+\caption{Eight car models of all datasets, solved on the SAM masks and LiDAR-fitted cuboids. Per car: the video frame with
 the car framed; the model with the original pixels of its best views from the front left and from the rear left; its
 solid IoU against the closed LiDAR and its length against the labelled length.}
 \label{fig:large}
@@ -526,38 +526,6 @@ coloured by mirroring).}
 \label{fig:cyclist}
 \end{figure}
 
-\paragraph{Other vehicles and an uncalibrated camera.} Nothing in the window triangulation depends on the class of
-the vehicle. To test it on vehicles unlike the cars it was developed on, we ran it on a public street-camera video
-(1280$\times$720 pixels, 30 frames per second) of a column of tracked military vehicles, without calibration and
-without LiDAR. The camera comes from two vanishing points, the vertical of the building edges and the direction of the
-road given by the vehicles' ground tracks; their orthogonality gives the focal length (1494~px, principal point at
-the image centre), and the scale rests on an assumed camera height of 6~m. The vehicles are detected and tracked by
-an off-the-shelf instance segmenter and tracker (YOLO11 with ByteTrack), and their masks come from SAM~2.1 prompted
-by the tracked boxes. The windows are solved as in Sect.~\ref{sec:window} and aligned to each other by a trimmed
-planar ICP \cite{icp}, then refined per window against the silhouettes of the other windows; the shape is the
-symmetric visual hull in the vehicle's frame. Two steps are new. A tracked vehicle turns on the spot, so its axis is
-taken from the windows in which it drives straight (more than 5~cm per frame, less than $3^\circ$ of turn) rather
-than from the direction of travel; this turned one vehicle's model by $15^\circ$ and raised its silhouette overlap on
-frames left out of the carving from 0.82 to 0.84, and changed the others by less than $5^\circ$. And the visual hull of
-views that all come from one side and from above grows spurs and tapering ends on the unseen side; a morphological
-opening and a cut of the end slices whose section is below half the median remove them. Fig.~\ref{fig:best} shows
-the best frames of all object types, among them two vehicles in a three-quarter view. On frames left out of the
-carving the silhouette overlap is 0.86 for the rocket launcher and 0.83 for the tracked carrier. The carrier comes out
-8.7~m long, about 2~m longer than a vehicle of its type, because its ends are seen only from above and from one side;
-cutting them as for the launcher shortens it to 6.7~m but also cuts its front in the frames. A third vehicle, seen
-only head-on through smoke for 1.5~s, gave two usable windows and a box without detail.
-
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{best_frames.jpg}
-\caption{The best frames of each object type: (a) a car of intersection A, (b) a van of intersection B, (c) a cyclist
-of V2X-Seq-SPD, with their calibrated cameras and LiDAR boxes; (d) and
-(e) a street-camera video of tracked military vehicles with an uncalibrated camera, whose scale rests on an assumed
-camera height of 6~m; (d) and (e) are three-quarter views. Per row: the frame; the model rendered into it, with the
-SAM mask outlined; the model from another view. IoU: the model's silhouette against the mask in the frame shown.}
-\label{fig:best}
-\end{figure}
-
 \paragraph{A moving camera.} To test the dependence on the fixed camera we ran the pipeline on the vehicle side of the
 same sequence. The camera's pose comes from monocular visual odometry: corners tracked frame to frame, the five-point
 essential matrix \cite{nister5pt} for the rotation and the direction of the step, and the step's length from the road
@@ -598,9 +566,8 @@ thousands of labelled boxes from comparable cameras and output no shape. Learned
 \cite{laurentini,spacecarving} need many, widely spread viewpoints; a single high camera gives a narrow range of
 directions per car, which is why our visual hull alone over-estimates the height and the length of cars seen end-on.
 Our method uses the motion of the car itself to obtain the views that a static multi-camera setup would provide, and
-uses the textured body for depth where silhouettes are ambiguous; it needs no training data, but it needs a fixed
-camera, calibrated or, with the scale from an assumed height, from vanishing points (Sect.~\ref{sec:results}), and
-enough motion, and it reconstructs a car only after it has been tracked for about two seconds.
+uses the textured body for depth where silhouettes are ambiguous; it needs no training data, but it needs a fixed,
+calibrated camera and enough motion, and it reconstructs a car only after it has been tracked for about two seconds.
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Limitations}\label{sec:limits}
