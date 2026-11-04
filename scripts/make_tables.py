@@ -1,8 +1,11 @@
-"""Tables and numbers of the article from the result files of whole_scene_cars.py (3dseg/docs).
+"""Tables and numbers of the article from the result files of whole_scene_cars.py (3dseg/docs), all on the precise
+annotation (SAM masks and LiDAR-fitted cuboids, 3dseg make_dumps.py), scored against the labels (LIDAR_BOX=0).
 
 Run from the article folder: python scripts/make_tables.py
-Inputs: docs/whole_scene_cars_abl2_<run>.json (ablation runs, scripts/rerun_ablation.py), the label-box / own-size-box scores
-(oracle runs, below) and the moving-camera evaluation (below), all measured with the 3dseg code.
+Inputs: docs/whole_scene_cars_ann_<name>_<tag>.json for intersections A (Aall1, Aall2) and B (Ball): the full method
+(tag full) and the ablation (3dseg docs/precise_runs/ablation_precise.sh); the larger evaluation's
+docs/whole_scene_cars_ann_P_<clip>_all.json (docs/precise_runs/fusion_large.sh); the moving-camera evaluation (below).
+The labelled box and the box of our own size are scored per car by whole_scene_cars.py itself.
 """
 import json
 import os
@@ -12,12 +15,12 @@ import numpy as np
 DOCS = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tables")
 
-# boxes scored like the models (scripts/box_scores.py on the cars of A5 / B5): labelled box / box of our own L, W, H;
-# IoU raw, IoU closed, footprint IoU closed - on a grid covering box and LiDAR (see whole_scene_cars.shape_scores)
-# (scripts/box_scores.py on the final rows A5 / B5: raw, closed, scanned, footprint closed)
-BOXES = {"A": {"label": (0.376, 0.572, 0.548, 0.679), "own": (0.321, 0.525)},
-         "B": {"label": (0.378, 0.546, 0.533, 0.688), "own": (0.352, 0.524)}}
-OURS = {"A": "A5", "B": "B5"}                     # the current method (the last ablation row)
+SITES = {"A": ("Aall1", "Aall2"), "B": ("Ball",)}   # the precise runs of the two intersections
+OURS = "full"                                       # the current method
+# ablation: the full method, then one part left out at a time (tag, row name)
+STEPS = [("full", "full method (ours)"), ("noba", "$-$ one rigid body per track"), ("nosym", "$-$ symmetry"),
+         ("nocabin", "$-$ cabin from the masks"), ("noroof", "$-$ roof from the far edge"),
+         ("noprior", "$-$ cuboid completion of end-on cars")]
 # moving camera (V2X-Seq vehicle side, 58 windows): visual odometry and detection against the labels
 EGO = {"Egopath": "13\\,\\%", "Egolabels": 187, "Egofound": 25, "Egorecall": "0.13", "Egoprecision": "0.53"}
 
@@ -31,15 +34,19 @@ def write_macros(path, values):
             f.write(f"\\newcommand{{\\{name}}}{{{text}}}\n")
 
 
-def rows(run):
-    r = json.load(open(os.path.join(DOCS, f"whole_scene_cars_abl2_{run}.json")))
-    return [x for x in r if "fused closed: iou" in x]
+def rows(site, tag):
+    out = []
+    for name in SITES[site]:
+        p = os.path.join(DOCS, f"whole_scene_cars_ann_{name}_{tag}.json")
+        if os.path.exists(p):
+            out += [x for x in json.load(open(p)) if "fused closed: iou" in x]
+    return out
 
 
-def stats(run, labels=None):
+def stats(site, tag, labels=None):
     """Means over the evaluated cars, or over the cars of `labels` only (a label tracked twice counts twice)."""
-    R = [x for x in rows(run) if labels is None or x["label"] in labels]
-    m = lambda k: float(np.mean([x[k] for x in R]))
+    R = [x for x in rows(site, tag) if labels is None or x["label"] in labels]
+    m = lambda k: float(np.mean([x[k] for x in R])) if all(k in x for x in R) else float("nan")
     return {"n": len(R), "labels": len({x["label"] for x in R}), "raw": m("fused: iou"), "closed": m("fused closed: iou"),
             "scanned": m("fused closed: scanned_iou") if all("fused closed: scanned_iou" in x for x in R) else float("nan"),
             "median": float(np.median([x["fused closed: iou"] for x in R])),
@@ -50,28 +57,31 @@ def stats(run, labels=None):
             "single_raw": m("single window: iou"), "single_closed": m("single closed: iou"),
             "centre": float(np.median([x["centre_err_m"] for x in R])),
             "along": float(np.median([x["pose: along-ray err m"] for x in R if "pose: along-ray err m" in x] or [np.nan])),
-            "across": float(np.median([x["pose: across-ray err m"] for x in R if "pose: across-ray err m" in x] or [np.nan]))}
+            "across": float(np.median([x["pose: across-ray err m"] for x in R if "pose: across-ray err m" in x] or [np.nan])),
+            "lab_raw": m("box label: iou"), "lab_closed": m("box label closed: iou"),
+            "lab_scanned": m("box label closed: scanned_iou"), "lab_foot": m("box label closed: footprint_iou"),
+            "own_raw": m("box own: iou"), "own_closed": m("box own closed: iou")}
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    runs = {"A": ("A0", "A1", "A2", "A3", "A4", "A5"), "B": ("B0", "B1", "B2", "B3", "B4", "B5")}
-    S = {run: stats(run) for site in runs for run in runs[site]}
-    # the ablation on the cars evaluated in every row (the versions track slightly different cars)
-    common = {site: set.intersection(*[{x["label"] for x in rows(r)} for r in runs[site]]) for site in runs}
-    SC = {run: stats(run, common[site]) for site in runs for run in runs[site]}
-    A, B = S[OURS["A"]], S[OURS["B"]]
+    tags = [t for t, _ in STEPS]
+    S = {(site, t): stats(site, t) for site in SITES for t in tags}
+    # the ablation on the cars evaluated in every row
+    common = {site: set.intersection(*[{x["label"] for x in rows(site, t)} for t in tags]) for site in SITES}
+    SC = {(site, t): stats(site, t, common[site]) for site in SITES for t in tags}
+    A, B = S[("A", OURS)], S[("B", OURS)]
     write_macros(os.path.join(OUT, "numbers.tex"), {
         "AsixClosed": A["closed"], "AsixRaw": A["raw"],
         "BsixClosed": B["closed"], "BsixRaw": B["raw"],
-        "AlabClosed": BOXES["A"]["label"][1], "AlabRaw": BOXES["A"]["label"][0],
-        "BlabClosed": BOXES["B"]["label"][1], "BlabRaw": BOXES["B"]["label"][0],
-        "AboxClosed": BOXES["A"]["own"][1], "BboxClosed": BOXES["B"]["own"][1],
+        "AlabClosed": A["lab_closed"], "AlabRaw": A["lab_raw"],
+        "BlabClosed": B["lab_closed"], "BlabRaw": B["lab_raw"],
+        "AboxClosed": A["own_closed"], "BboxClosed": B["own_closed"],
         "AsingleClosed": A["single_closed"], "BsingleClosed": B["single_closed"],
-        "Acars": A["n"], "Bcars": B["n"], "Alabels": A["labels"], "Blabels": B["labels"], "AprevClosed": S["A0"]["closed"], "BprevClosed": S["B0"]["closed"],
-        "Ascanned": A["scanned"], "AlabScanned": BOXES["A"]["label"][2],
+        "Acars": A["n"], "Bcars": B["n"], "Alabels": A["labels"], "Blabels": B["labels"],
+        "Ascanned": A["scanned"], "AlabScanned": A["lab_scanned"],
         "Acentre": f"{A['centre']:.1f}", "Bcentre": f"{B['centre']:.1f}",
-        "Aalong": f"{A['along']:.2f}", "Aacross": f"{A['across']:.2f}", "Balong": f"{B['along']:.1f}",
+        "Aalong": f"{A['along']:.2f}", "Aacross": f"{A['across']:.2f}", "Balong": f"{B['along']:.2f}",
         "Bacross": f"{B['across']:.2f}", "Acommon": len(common["A"]), "Bcommon": len(common["B"]), **EGO})
 
     def fmt(v, d=3):
@@ -90,10 +100,9 @@ def main():
              r" & & raw & closed & IoU & err.\ (cm) & $L$ & $W$ & $H$ \\", r"\midrule"]
     count = lambda st: f"{st['n']} cars" if st["n"] == st["labels"] else f"{st['n']} tracks of {st['labels']} cars"
     for site, st, name in (("A", A, f"A ({count(A)})"), ("B", B, f"B ({count(B)})")):
-        bx = BOXES[site]
-        lines += [rf"\multirow{{4}}{{*}}{{{name}}} & labelled box & {bx['label'][0]:.3f} & {bx['label'][1]:.3f} & "
-                  rf"{bx['label'][3]:.3f} & -- & 0 & 0 & 0 \\",
-                  rf" & box of our size & {bx['own'][0]:.3f} & {bx['own'][1]:.3f} & -- & -- & {st['dL']:.2f} & "
+        lines += [rf"\multirow{{4}}{{*}}{{{name}}} & labelled box & {st['lab_raw']:.3f} & {st['lab_closed']:.3f} & "
+                  rf"{st['lab_foot']:.3f} & -- & 0 & 0 & 0 \\",
+                  rf" & box of our size & {st['own_raw']:.3f} & {st['own_closed']:.3f} & -- & -- & {st['dL']:.2f} & "
                   rf"{st['dW']:.2f} & {st['dH']:.2f} \\",
                   rf" & best single window & {st['single_raw']:.3f} & {st['single_closed']:.3f} & -- & -- & -- & -- & -- \\",
                   rf" & \textbf{{ours}} & \textbf{{{st['raw']:.3f}}} & \textbf{{{st['closed']:.3f}}} & {st['foot']:.3f} & "
@@ -102,27 +111,29 @@ def main():
     lines += [r"\end{tabular}}", r"\end{table}"]
     open(os.path.join(OUT, "main_table.tex"), "w").write("\n".join(lines) + "\n")
 
-    # ablation: changes added one at a time
-    steps = [("0", "previous version"), ("1", "+ cabin taper"),
-             ("2", "+ length prior where never seen side-on"), ("3", "+ one rigid car per track"),
-             ("4", "+ softer hull vote for those cars"), ("5", "+ body-type profile for them (ours)")]
+    # ablation: one part of the method left out at a time
     lines = [r"\begin{table}[t]", r"\centering",
-             r"\caption{Ablation on both intersections, changes added one at a time. IoU and height error against the"
-             rf" gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors (m); on the cars evaluated in every"
-             rf" row ({len(common['A'])} on A, {len(common['B'])} on B). The pipeline is deterministic: repeated runs,"
-             r" with the track solves recomputed from scratch, give identical numbers.}",
+             r"\caption{Ablation on both intersections: the full method and one part left out at a time, on the same"
+             r" windows. IoU and height error against the gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors"
+             rf" (m); on the cars evaluated in every row ({len(common['A'])} on A, {len(common['B'])} on B). The"
+             r" pipeline is deterministic: repeated runs, with the track solves recomputed from scratch, give identical"
+             r" numbers.}",
              r"\label{tab:ablation}", r"\setlength{\tabcolsep}{3.5pt}",
              r"\resizebox{\textwidth}{!}{%", r"\begin{tabular}{lcccccccc}", r"\toprule",
              r" & \multicolumn{4}{c}{intersection A} & \multicolumn{4}{c}{intersection B} \\",
              r"\cmidrule(lr){2-5}\cmidrule(lr){6-9}",
              r" & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ \\", r"\midrule"]
-    for k, name in steps:
-        a, b = SC["A" + k], SC["B" + k]
+    for k, name in STEPS:
+        a, b = SC[("A", k)], SC[("B", k)]
         ia, ib = f"{a['closed']:.3f}", f"{b['closed']:.3f}"
-        if k == "5":   # the current method
+        if k == OURS:
             ia, ib = rf"\textbf{{{ia}}}", rf"\textbf{{{ib}}}"
         lines.append(rf"{name} & {ia} & {a['herr']:.1f} & {a['dL']:.2f} & {a['dH']:.2f} & "
                      rf"{ib} & {b['herr']:.1f} & {b['dL']:.2f} & {b['dH']:.2f} \\")
+        if k == OURS:
+            lines.append(r"\midrule")
+    a, b = SC[("A", OURS)], SC[("B", OURS)]
+    lines.append(rf"best single window & {a['single_closed']:.3f} & -- & -- & -- & {b['single_closed']:.3f} & -- & -- & -- \\")
     lines += [r"\bottomrule", r"\end{tabular}}", r"\end{table}"]
     open(os.path.join(OUT, "ablation.tex"), "w").write("\n".join(lines) + "\n")
     for k, v in SC.items():
@@ -136,27 +147,24 @@ LARGE = [("DAIR-V2X-C", "dair_c_runs", "Dair"), ("V2X-Seq-SPD", "spd_runs", "Spd
 
 
 def pooled_full_run(runs_dir):
-    """One dataset of the full run (3dseg docs/whole_scene_cars_all_<clip>.json) against pool.py's labelled boxes
-    (<clip>/boxes.json, keyed by the old cars.json track ids), paired by LABEL; a label our tracker split into two
-    fragments keeps the LONGER track (never the higher score, which would bias the pair - as scripts/paired_ci.py).
-    Per intersection and "all": cars, mean IoUs (ours / box, raw / closed), median position errors."""
+    """One dataset of the larger evaluation on the precise annotation (3dseg docs/whole_scene_cars_ann_P_<clip>_all.json,
+    whose rows carry the labelled box's scores); a label in two track fragments keeps the LONGER track (never the
+    higher score, which would bias the pair - as scripts/paired_ci.py). Per intersection and "all": cars, mean IoUs
+    (ours / box, raw / closed), median position errors."""
     items = []
     for c in json.load(open(os.path.join(runs_dir, "chosen.json"))):
-        ours_p = os.path.join(DOCS, f"whole_scene_cars_all_{c['clip']}.json")
-        cars_p, boxes_p = (os.path.join(runs_dir, c["clip"], f) for f in ("cars.json", "boxes.json"))
-        if not all(os.path.exists(p) for p in (ours_p, cars_p, boxes_p)):
+        ours_p = os.path.join(DOCS, f"whole_scene_cars_ann_P_{c['clip']}_all.json")
+        if not os.path.exists(ours_p):
             continue
-        bx = json.load(open(boxes_p))
-        lab2box = {r["label"]: bx[str(r["track"])] for r in json.load(open(cars_p)) if r.get("label") and str(r["track"]) in bx}
         ours = {}
         for r in json.load(open(ours_p)):
-            if "fused closed: iou" in r and r.get("label") and (r["label"] not in ours or r["windows"] > ours[r["label"]]["windows"]):
+            if "fused closed: iou" in r and "box label closed: iou" in r and r.get("label") and \
+                    (r["label"] not in ours or r["windows"] > ours[r["label"]]["windows"]):
                 ours[r["label"]] = r
         for lab, r in ours.items():
-            if lab in lab2box:
-                items.append((c["intersection"], r["fused: iou"], lab2box[lab]["box: iou"], r["fused closed: iou"],
-                              lab2box[lab]["box closed: iou"], r.get("pose: along-ray err m", np.nan),
-                              r.get("pose: across-ray err m", np.nan)))
+            items.append((c["intersection"], r["fused: iou"], r["box label: iou"], r["fused closed: iou"],
+                          r["box label closed: iou"], r.get("pose: along-ray err m", np.nan),
+                          r.get("pose: across-ray err m", np.nan)))
     def agg(sel):
         a = np.array([t[1:] for t in sel], float)
         return {"cars": len(sel), "ours raw": float(a[:, 0].mean()), "box raw": float(a[:, 1].mean()),
