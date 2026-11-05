@@ -5,7 +5,7 @@
 
 \signature{Dmitriy Zhuravlev}
 \address{Dmitriy Zhuravlev\\Taras Shevchenko National University of Kyiv\\Kyiv, Ukraine\\dzhuravlev@ukr.net}
-\date{27 October 2026}
+\date{5 November 2026}
 
 \begin{document}
 \begin{letter}{The Editor-in-Chief\\EURASIP Journal on Image and Video Processing}
@@ -15,18 +15,21 @@ I am pleased to submit the manuscript ``Learning-Free 3D Triangulation of Moving
 as a Research Article in the EURASIP Journal on Image and Video Processing.
 
 Monocular 3D perception for roadside cameras is today almost always a learned detector that outputs 3D boxes and
-needs thousands of labelled boxes from the same kind of camera. The manuscript shows that the 3D \emph{shape} of the
-cars passing a fixed, calibrated camera can be recovered without any learning and without labels. In short windows
-of the video each moving car is triangulated, and its planar rigid motion and the depth of every vertex are solved
-jointly; over the whole video the windows of one car are solved together as one rigid car, mirrored about its
-symmetry plane, averaged as a robust height field and completed by a visual hull of edge-snapped silhouettes. LiDAR
-and 3D labels are used for evaluation only. On 213 cars of two public datasets and thirteen intersections the models
-reach a solid IoU of 0.61--0.62 against the cars' accumulated LiDAR, statistically level with the labelled 3D boxes
-scored the same way (0.62--0.64; paired bootstrap intervals contain zero, also on the clips that informed no design
-choice). The evaluation also shows that the raw
-accumulated LiDAR is a strongly biased reference at long range, against which the labelled box scores only 0.38, and
-the manuscript reports its limits openly: about half of the visible cars are lost before reconstruction, pedestrians
-and cyclists need a good tracker, and on a moving vehicle camera the method finds only a small share of the cars.
+needs thousands of labelled boxes from the same kind of camera. The manuscript presents a learning-free 3D
+triangulation of the objects that move past a fixed, calibrated, elevated camera. Its input is a mask and a 3D cuboid
+of each moving object per frame, from any source --- background subtraction and optical-flow clustering,
+vanishing-point calibration, or annotation. The orientation of each object comes from its motion; in short windows
+of the video its masked surface is triangulated, its planar rigid motion and the depth of every vertex solved
+jointly, with the scale from the cuboid; the windows of one object are then solved together as one rigid body,
+mirrored about its symmetry plane, and completed by the visual hull of its masks. Only symmetry is assumed, so the
+same steps reconstruct cars, cyclists, motorcyclists and pedestrians. LiDAR and 3D labels are used for evaluation
+only. With precise masks and cuboids, on 237 cars of two public datasets and thirteen intersections, the models are
+ahead of the labelled 3D boxes scored the same way against the cars' accumulated LiDAR on all four sets, with paired
+bootstrap intervals clear of zero (by $+0.064$ on DAIR-V2X-C and $+0.026$ on V2X-Seq-SPD, also on the clips that
+informed no design choice). The evaluation also shows that the raw accumulated LiDAR is a strongly biased reference at
+long range, against which the labelled box scores only 0.35, and the manuscript reports its limits openly: slow cars
+come out too long, a walking pedestrian is triangulated only by its silhouettes, and on a moving vehicle camera the
+automatic front end finds only a small share of the cars.
 
 I believe the work suits the journal because it is image and video processing in the classical sense: multi-view
 geometry, dense optical flow, silhouette extraction and fusion of evidence over a whole video, applied to traffic
@@ -35,8 +38,9 @@ interpretable alternative to learned detectors and a concrete account of where s
 
 The manuscript is original, has not been published and is not under consideration for publication elsewhere. My
 earlier papers, cited in the manuscript, recovered 3D \emph{boxes} from single images with inverse perspective mapping
-and segmented moving objects by optical-flow clustering; the present work, its video-level shape reconstruction and
-its LiDAR evaluation are new. I am the sole author and approve the submission. I have no competing interests. An AI
+and segmented moving objects by optical-flow clustering --- methods that can supply the masks and cuboids the present
+work takes as input; its 3D triangulation of the moving objects over the whole video and its LiDAR evaluation are
+new. I am the sole author and approve the submission. I have no competing interests. An AI
 coding assistant was used to help implement the code and edit the text; this is disclosed in the manuscript, and I
 take full responsibility for its content.
 

@@ -491,10 +491,11 @@ Fig.~\ref{fig:cars} shows the best cars up close with their LiDAR.
 \input{tables/paired_ci.tex}
 
 \paragraph{Paired comparison.} Table~\ref{tab:paired} pairs every car with its labelled box and bootstraps the
-mean difference. Our models are ahead of the box with the interval clear of zero on both intersections ($+0.092$ on
-A, $+0.107$ on B) and on the \DairCars{} cars of DAIR-V2X-C ($+0.058$ $[+0.037, +0.079]$), also on its clips that
-informed no choice ($+0.051$ $[+0.020, +0.078]$, 61 cars). On V2X-Seq-SPD the difference is small and not separated
-from zero ($+0.018$ $[-0.003, +0.037]$): there the slow cars of its busiest intersection come out too long
+mean difference. Our models are ahead of the box with the interval clear of zero on all four sets: on both
+intersections ($+0.100$ on A, $+0.107$ on B), on the \DairCars{} cars of DAIR-V2X-C ($+0.064$ $[+0.043, +0.083]$)
+and on the \SpdCars{} cars of V2X-Seq-SPD ($+0.026$ $[+0.005, +0.046]$), also on the clips that informed no choice
+($+0.057$ $[+0.026, +0.084]$, 61 cars, and $+0.026$ $[+0.004, +0.045]$, 92 cars). The margin is smallest on
+V2X-Seq-SPD, where the slow cars of its busiest intersection come out too long
 (Sect.~\ref{sec:limits}). The cars completed from their cuboid are not worse than the measured ones. About a third of the
 occupied columns of the gap-closed reference were added by the closing itself (mean filled share 0.37 on A); scored
 on all columns except that invented volume, where a model sticking out of the car still counts, the pair barely
@@ -539,13 +540,15 @@ only) and the solid IoU against it.}
 pipeline is deterministic, and repeated runs, with the track solves recomputed from scratch, give identical numbers.
 The cabin carved from the masks carries the method: without it the height field keeps whatever the depth of the
 windows puts above the car, and the IoU falls to 0.348 on A and 0.437 on B, with height errors of 54 and 33~cm.
-Solving the windows of a car together, as one rigid body, gains $+0.015$ on A and $+0.007$ on B and lowers the length
-error on A from 0.38 to 0.28~m; the symmetry gains $+0.005$ and $+0.008$. The roof from the far edge of the masks and
-the completion of end-on cars from their cuboid matter where the cars are seen end-on: on B, where every car is,
-they gain $+0.022$ and $+0.053$ (height error 20.0 to 11.3~cm); on A, where 22 of the 24 cars are seen side-on, they
-cost $0.008$ and $0.003$. We keep both, as the method has to work for cars seen from any side. Filling the unseen
-part of every car with its cuboid instead of the masks' carve, and placing every window by its cuboid instead of the
-rigid solve, we tried and dropped: both scored lower on A (0.599--0.616 and 0.619 against 0.637). We also tried and dropped, because they did not
+Solving the windows of a car together, as one rigid body, gains $+0.021$ on A and $+0.007$ on B and lowers the length
+error on A from 0.38 to 0.28~m; the symmetry gains $+0.007$ and $+0.008$. The roof from the far edge of the masks and
+the completion of end-on cars from their cuboid apply to the cars never seen side-on: on B, where every car is,
+they gain $+0.022$ and $+0.053$ (height error 20.0 to 11.3~cm); on A, where 22 of the 24 cars are seen side-on, the
+roof changes nothing and the completion costs $0.003$. Applied to every car, the roof cap lowered the side-on cars of A
+by 0.10~m against their LiDAR and their IoU from 0.645 to 0.637 (Sect.~\ref{sec:completion}). Filling the unseen part
+of every car with its cuboid instead of the masks' carve, placing every window by its cuboid instead of the rigid
+solve, and bounding the width by the cuboid's, we tried and dropped: all scored lower on A (0.599--0.616, 0.621 and
+0.616 against 0.637 at the time). We also tried and dropped, because they did not
 help on A and B: a weight of each window by its triangulation angle; a term making the points of one physical
 location in two windows coincide (it brings them together, from 0.5--0.8~m apart to 2~cm, but the shape does not
 improve); the body height as a soft penalty instead of a bound; a texture test against shadows on dark cars; and a
@@ -581,8 +584,8 @@ measured per time slot. Table~\ref{tab:large} scores every car with a LiDAR refe
 references. On DAIR-V2X-C the \DairCars{} cars reach \DairOursClosed{} against \DairBoxClosed{} for the labelled boxes
 on the closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one; on V2X-Seq-SPD the \SpdCars{} cars
 reach \SpdOursClosed{} against \SpdBoxClosed{} (\SpdOursRaw{} against \SpdBoxRaw{} raw). On DAIR-V2X-C our models are
-ahead at every intersection; on V2X-Seq-SPD at four of six, and level with the box at its busiest one (yz06, 48 cars,
-0.683 against 0.685), where many cars creep through the intersection and come out about 0.5~m too long
+ahead at every intersection, and on V2X-Seq-SPD too, by the smallest margin at its busiest one (yz06, 48 cars,
+0.695 against 0.685), where many cars creep through the intersection and come out about 0.5~m too long
 (Sect.~\ref{sec:limits}). Of the 224 cars of these clips with a LiDAR reference, 198 are scored; the other 26 have
 fewer than the five windows a model needs (most have none: no frame of them passes the visibility test of a window,
 as the car is occluded or cut by the image border). Figure~\ref{fig:large} shows eight car models of both datasets next to the cars in the video.
@@ -666,8 +669,8 @@ There is no common benchmark for car \emph{shapes} from roadside video, and publ
 average precision of boxes, not shape IoU against LiDAR; their numbers are not comparable with ours, and we did not
 retrain them. Table~\ref{tab:compare} therefore compares what each family of methods needs and produces.
 Quantitatively, the labelled box and the box of our own size in Table~\ref{tab:main} stand in for a perfect and for a
-size-only box detector: our shapes exceed both on A and B, exceed the labelled box on DAIR-V2X-C and are level with
-it on V2X-Seq-SPD (Tables~\ref{tab:large} and~\ref{tab:paired}).
+size-only box detector: our shapes exceed both on A and B, and exceed the labelled box on DAIR-V2X-C and, by a
+smaller margin, on V2X-Seq-SPD (Tables~\ref{tab:large} and~\ref{tab:paired}).
 
 \input{tables/compare.tex}
 
@@ -692,7 +695,7 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
   input, too, 26 of 224 cars of the larger evaluation have fewer than five windows.
 \item \emph{Slow cars.} A car that creeps through the intersection for a long time is seen in many windows whose
   small misalignments along its path add up: on the busiest intersection of V2X-Seq-SPD the cars come out a median of
-  0.5~m too long, and the gain over the labelled box vanishes there. A single window measures them at the right
+  0.5~m too long, and the gain over the labelled box is smallest there. A single window measures them at the right
   length; placing the windows by their cuboids instead of the rigid solve does not remove it.
 \item \emph{Completion.} A car never seen side-on --- typically one seen only from behind --- takes its length from
   the cuboid and its profile from the masks' carve; its length is then the cuboid's, not a measurement.
@@ -714,7 +717,7 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 From a single fixed, elevated roadside camera, without any learning, the 3D shapes of the objects that move past it
 can be triangulated from their masks and cuboids: measured against the cars' own LiDAR at up to 70~m, the car models
 are ahead of the labelled 3D boxes on both intersections the method was developed on and on \DairCars{} cars of
-DAIR-V2X-C, and level with them on \SpdCars{} cars of V2X-Seq-SPD. Three ingredients carry it: the object's own
+DAIR-V2X-C, and by a smaller margin on \SpdCars{} cars of V2X-Seq-SPD. Three ingredients carry it: the object's own
 motion, which turns one camera into many views of its textured surface; the whole video, solved as one rigid body and
 completed by symmetry and by the masks' carve; and, only where the video never measured the length, the cuboid. As
 only symmetry is assumed, the same steps give cyclists, motorcyclists and pedestrians. The evaluation also shows that
