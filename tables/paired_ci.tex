@@ -1,28 +1,28 @@
 \begin{table}[t]
 \centering
-\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}: the car's length was seen side-on ($\ge 2$ side-on windows, \texttt{n\_side} $\ge 2$); \emph{prior}: capped by the 4.6\,m length prior; \emph{held-out}: without the five clips that informed a choice during development. Intersection A is the tuning set of the method; B informed three choices (Sect.~\ref{sec:protocol}).}
+\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}: the car's length was seen side-on ($\ge 2$ side-on windows); \emph{completed}: never seen side-on, length and profile completed from its cuboid; \emph{held-out}: without the five clips that informed a choice during development. Intersection A is the tuning set of the method; B informed three choices (Sect.~\ref{sec:protocol}).}
 \label{tab:paired}
 \small
 \begin{tabular}{llrcl}
 \toprule
 Dataset & length & cars & mean $\Delta$ IoU & 95\,\% CI \\
 \midrule
-intersection A (tuning) & all & 18 & +0.043 & [+0.013, +0.072] \\
- & measured & 15 & +0.045 & [+0.017, +0.071] \\
- & prior & 3 & +0.035 & [-0.107, +0.124] \\
+intersection A (tuning) & all & 24 & +0.092 & [+0.070, +0.115] \\
+ & measured & 22 & +0.092 & [+0.070, +0.116] \\
+ & completed & 2 & +0.089 & [+0.031, +0.146] \\
 \midrule
-intersection B & all & 7 & +0.024 & [-0.023, +0.073] \\
- & prior & 7 & +0.024 & [-0.023, +0.073] \\
+intersection B & all & 15 & +0.107 & [+0.086, +0.129] \\
+ & completed & 15 & +0.107 & [+0.086, +0.129] \\
 \midrule
-DAIR-V2X-C & all & 109 & -0.006 & [-0.025, +0.012] \\
- & measured & 74 & -0.016 & [-0.042, +0.008] \\
- & prior & 35 & +0.015 & [-0.011, +0.043] \\
- & held-out & 71 & +0.001 & [-0.021, +0.022] \\
+DAIR-V2X-C & all & 96 & +0.058 & [+0.037, +0.079] \\
+ & measured & 74 & +0.052 & [+0.025, +0.077] \\
+ & completed & 22 & +0.078 & [+0.056, +0.100] \\
+ & held-out & 61 & +0.051 & [+0.020, +0.078] \\
 \midrule
-V2X-Seq-SPD & all & 104 & -0.018 & [-0.041, +0.004] \\
- & measured & 66 & -0.051 & [-0.077, -0.027] \\
- & prior & 38 & +0.038 & [+0.000, +0.078] \\
- & held-out & 94 & -0.017 & [-0.042, +0.009] \\
+V2X-Seq-SPD & all & 102 & +0.018 & [-0.003, +0.037] \\
+ & measured & 72 & +0.015 & [-0.007, +0.035] \\
+ & completed & 30 & +0.024 & [-0.021, +0.064] \\
+ & held-out & 92 & +0.016 & [-0.006, +0.035] \\
 \bottomrule
 \end{tabular}
 \end{table}

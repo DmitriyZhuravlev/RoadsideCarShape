@@ -1,31 +1,25 @@
-"""Pedestrians and cyclists for the article: video (object framed) | own tracking | given tracking (labelled 2D boxes)
-| given tracking from the side; plain Poisson surfaces."""
-import json, os, sys
-sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/scripts"))
-sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/code/3dseg"))
+"""Pedestrians and cyclists for the article, on the precise input: frame | SAM 2.1 mask | LiDAR box | the model as the
+camera saw it | turned 90 deg (the row images of vru_lidar.py). Pedestrians: carve with symmetry only; cyclists: carve
+bounded by the surface triangulated over the pass (tri_vru.py, OCC_OVERRIDE)."""
+import os, re
 import cv2, numpy as np
-import cars_figure as cf, spsr
-D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
-S = os.environ.get("VRU_PHOTOS", os.path.dirname(os.path.abspath(__file__)))
-PICK = [("seq_0036", "002251"), ("seq_0077", "000118"), ("seq_0059", "003921"), ("seq_0063", "003765")]
-W, H = 260, 300
-def render(npz, eye, title):
-    z = np.load(npz); V, F, C = spsr.smooth_mesh(z["V"], z["F"].astype(int), z["C"].astype(float), h=0.02, alpha=0.0)
-    K = np.array([[1.6 * W, 0, W / 2], [0, 1.6 * W, H / 2], [0, 0, 1]])
-    return cf.panel(cf.render_mesh(np.full((H, W, 3), 255, np.uint8), cf.look_at(K, eye, np.array([0.0, 0.0, 0.85])), V, F, C), title, size=(W, H))
-def photo(p, title):
-    img = cv2.imread(p); sc = min(W / img.shape[1], (H - 26) / img.shape[0])
-    img = cv2.resize(img, (max(1, int(img.shape[1] * sc)), max(1, int(img.shape[0] * sc))), interpolation=cv2.INTER_CUBIC)
-    can = np.full((H - 26, W, 3), 255, np.uint8); y0, x0 = (H - 26 - img.shape[0]) // 2, (W - img.shape[1]) // 2
-    can[y0:y0 + img.shape[0], x0:x0 + img.shape[1]] = img
-    return cf.panel(can, title, size=(W, H))
-e1, e2 = np.array([3.6, 3.0, 1.8]), np.array([0.0, 4.6, 1.2])
+D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs/vru_precise")
+ROWS = [("seq_0077_000118/carve/vru_000118.jpg", "seq_0077_000118/carve.log"),
+        ("seq_0059_003926/carve/vru_003926.jpg", "seq_0059_003926/carve.log"),
+        ("seq_0059_003897/tri/vru_003897.jpg", "seq_0059_003897/final.log")]
+# (cyclist 003765 of seq_0063 left out: its mask takes in the courier box of the scooter beside it)
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures", "vru_compare.png")
 rows = []
-for seq, tid in PICK:
-    own, lab = (f"{D}/{d}/{seq}/{tid}" for d in ("vru_new", "vru_lab"))
-    ro, rl = json.load(open(own + ".json")), json.load(open(lab + ".json"))
-    rows.append(np.hstack([photo(os.path.join(S, f"vrulab_{seq}_{tid}.jpg"), f"{rl['type']}: video"),
-                           render(own + ".npz", e1, f"own tracking, IoU {ro['holdout_iou']:.2f}"),
-                           render(lab + ".npz", e1, f"given tracking, IoU {rl['holdout_iou']:.2f}"),
-                           render(lab + ".npz", e2, f"H {rl['height']:.2f} / {rl['label_height']:.2f} m")]))
-out = os.path.join(D, "vru_compare.png"); cv2.imwrite(out, np.vstack(rows)); print(out)
+for img, log in ROWS:
+    im = cv2.imread(os.path.join(D, img))[:, :5 * 320].copy()     # six panels of 320 px: drop the view from behind
+    im[282:, :960] = 255                                            # the old caption over the first three panels
+    txt = open(os.path.join(D, log)).read().splitlines()
+    last = [l for l in txt if "IoU vs its LiDAR" in l][-1]
+    iou = float(re.search(r"IoU vs its LiDAR ([\d.]+)", last).group(1))
+    L, W, H = map(float, re.search(r"size L ([\d.]+) W ([\d.]+) H ([\d.]+)", last).groups())
+    l, w, h = map(float, re.search(r"LiDAR box L ([\d.]+) W ([\d.]+) H ([\d.]+)", next(t for t in txt if "LiDAR box L" in t)).groups())
+    band = np.full((28, im.shape[1], 3), 255, np.uint8)
+    cv2.putText(band, f"IoU vs its LiDAR {iou:.2f}; model {L:.2f} x {W:.2f} x {H:.2f} m, LiDAR box {l:.2f} x {w:.2f} x {h:.2f} m",
+                (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (30, 30, 30), 1, cv2.LINE_AA)
+    rows += [im, band, np.full((8, im.shape[1], 3), 255, np.uint8)]
+cv2.imwrite(OUT, np.vstack(rows[:-1])); print(OUT)

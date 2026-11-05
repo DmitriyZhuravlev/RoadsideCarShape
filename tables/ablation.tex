@@ -1,6 +1,6 @@
 \begin{table}[t]
 \centering
-\caption{Ablation on both intersections, changes added one at a time. IoU and height error against the gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors (m); on the cars evaluated in every row (17 on A, 7 on B). The pipeline is deterministic: repeated runs, with the track solves recomputed from scratch, give identical numbers.}
+\caption{Ablation on both intersections: the full method and one part left out at a time, on the same windows. IoU and height error against the gap-closed LiDAR; $|\Delta L|$, $|\Delta H|$: mean size errors (m); on the cars evaluated in every row (24 on A, 15 on B). The pipeline is deterministic: repeated runs, with the track solves recomputed from scratch, give identical numbers.}
 \label{tab:ablation}
 \setlength{\tabcolsep}{3.5pt}
 \resizebox{\textwidth}{!}{%
@@ -10,12 +10,14 @@
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}
  & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ & IoU & h.~err & $|\Delta L|$ & $|\Delta H|$ \\
 \midrule
-previous version & 0.564 & 24.8 & 0.70 & 0.31 & 0.392 & 24.6 & 2.33 & 0.26 \\
-+ cabin taper & 0.567 & 24.5 & 0.70 & 0.31 & 0.393 & 24.6 & 2.33 & 0.26 \\
-+ length prior where never seen side-on & 0.580 & 24.5 & 0.48 & 0.31 & 0.486 & 26.3 & 0.29 & 0.21 \\
-+ one rigid car per track & 0.599 & 23.1 & 0.45 & 0.32 & 0.524 & 26.4 & 0.25 & 0.16 \\
-+ softer hull vote for those cars & 0.608 & 22.6 & 0.45 & 0.33 & 0.564 & 25.0 & 0.25 & 0.18 \\
-+ body-type profile for them (ours) & \textbf{0.615} & 20.5 & 0.45 & 0.31 & \textbf{0.571} & 26.6 & 0.25 & 0.15 \\
+full method (ours) & \textbf{0.637} & 15.5 & 0.28 & 0.22 & \textbf{0.637} & 11.3 & 0.25 & 0.10 \\
+\midrule
+$-$ one rigid body per track & 0.622 & 17.1 & 0.38 & 0.26 & 0.630 & 13.5 & 0.25 & 0.10 \\
+$-$ symmetry & 0.632 & 15.3 & 0.27 & 0.23 & 0.629 & 11.2 & 0.25 & 0.10 \\
+$-$ cabin from the masks & 0.348 & 53.9 & 0.59 & 0.59 & 0.437 & 32.6 & 0.86 & 0.35 \\
+$-$ roof from the far edge & 0.645 & 14.1 & 0.28 & 0.20 & 0.615 & 13.4 & 0.25 & 0.10 \\
+$-$ cuboid completion of end-on cars & 0.640 & 16.0 & 0.30 & 0.22 & 0.584 & 20.0 & 0.40 & 0.24 \\
+best single window & 0.280 & -- & -- & -- & 0.383 & -- & -- & -- \\
 \bottomrule
 \end{tabular}}
 \end{table}
