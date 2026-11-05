@@ -4,6 +4,7 @@ import cv2, numpy as np
 sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/scripts"))
 import cars_figure as cf
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
+SUFFIX = os.environ.get("SUFFIX", "_sub2")   # the model runs with the colours sampled on the subdivided surface
 # (dataset, run of the model on the precise annotation scored against the labels, label, run whose video photos frame
 # the car: the photo is the video, the same for any annotation)
 PICK = [("DAIR-V2X-C", "ann_P_clip_52_1_all", "000126", "all_clip_52_1"),
@@ -31,8 +32,8 @@ def row_of(run, lab):
     return max((x for x in json.load(open(f"{D}/whole_scene_cars_{run}.json")) if x.get("label") == lab and "fused closed: iou" in x),
                key=lambda x: x["fused closed: iou"])       # a label can be split over two track fragments
 for name, run, lab, prun in PICK:
-    r = row_of(run, lab)
-    m = json.load(open(f"{D}/cars_viewer_{run}/meshes.json"))[f"track {r['track']}"]
+    r = row_of(run + SUFFIX, lab)
+    m = json.load(open(f"{D}/cars_viewer_{run}{SUFFIX}/meshes.json"))[f"track {r['track']}"]
     rows.append(np.hstack([photo(f"{D}/photos_{prun}/track_{row_of(prun, lab)['track']}.jpg", f"{name}: video"),
                            tile(m, np.array([7.8, 8.4, 4.6]), f"model, IoU {r['fused closed: iou']:.2f}"),
                            tile(m, np.array([-7.5, 8.6, 3.8]), f"length {r['length']:.1f} m (label {r['label_length']:.1f} m)")]))

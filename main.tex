@@ -386,7 +386,9 @@ the car narrow spikes and thin sheets are removed (grey-scale opening with a 0.3
 narrower than 0.7~m are filled (grey-scale closing with a 0.7~m structuring element), so that the steps from bonnet to windshield to roof survive; a Gaussian of 1.2 cells follows. The
 surface of the regularised field (marching cubes \cite{marchingcubes}) is finally replaced by its Poisson surface
 \cite{kazhdan2006} on a 6~cm grid, which removes the staircase of the 10~cm columns; this changes the shown model, not
-the height field that is evaluated. Every vertex takes the original pixel, sampled bilinearly, of the windows that see
+the height field that is evaluated. For the figures the Poisson surface is subdivided twice (1-to-4), to about 1.5~cm
+between vertices, and coloured there: a pixel of the camera covers 1.6~cm of a car at 35~m, and colours sampled 6~cm
+apart blur wheels, handles and lights. Every vertex takes the original pixel, sampled bilinearly, of the windows that see
 it best --- preferring views with a larger cosine between its normal and the viewing direction and nearer views (the
 cosine divided by the distance) --- where it
 faces the camera, lies inside the car's silhouette and is not hidden by another part of the model (a z-buffer of the
@@ -597,6 +599,22 @@ as the car is occluded or cut by the image border). Figure~\ref{fig:large} shows
 the car framed; the model with the original pixels of its best views from the front left and from the rear left; its
 solid IoU against the closed LiDAR and its length against the labelled length.}
 \label{fig:large}
+\end{figure}
+
+Figure~\ref{fig:allsides} shows one more car of DAIR-V2X-C from all sides (clip 114\_0, car 000046). It turns in
+front of the camera at about 53~m, so its left side (39 of its 62 windows) and its rear are seen; the right side is
+the mirror image of the left. Its solid IoU against the closed LiDAR is 0.88; it is 4.8~m long against the labelled
+4.38~m and 5~cm lower than its LiDAR. What no window saw keeps the fill of Sect.~\ref{sec:completion}: the back
+in the body colour and, on the bonnet, the median colour of its height, which at the bonnet's height is partly glass.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=\textwidth]{all_sides.png}
+\caption{One car model of DAIR-V2X-C from all sides (clip 114\_0, car 000046, solid IoU 0.88 against the closed
+LiDAR): the video frame with the car framed, and the model from eight directions every 45$^\circ$ and from above.
+The camera saw its left side and its rear; the right side is mirrored; the colours are the original pixels of its
+best views, sampled on the twice subdivided Poisson surface.}
+\label{fig:allsides}
 \end{figure}
 
 \paragraph{Pedestrians, cyclists and motorcyclists.} The method assumes only that the object is roughly
