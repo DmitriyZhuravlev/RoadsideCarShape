@@ -53,7 +53,7 @@ PREAMBLE = r"""\documentclass[pdflatex,sn-aps,referee,lineno]{sn-jnl}% APS refer
 
 \begin{document}
 
-\title[Learning-Free 3D Car Shapes from a Roadside Video]{Learning-Free 3D Car Shapes from a Single Roadside Video}
+\title[Learning-Free 3D Triangulation from a Roadside Camera]{Learning-Free 3D Triangulation of Moving Objects from a Single Roadside Camera}
 
 \author*[1]{\fnm{Dmitriy} \sur{Zhuravlev}}\email{dzhuravlev@ukr.net}
 

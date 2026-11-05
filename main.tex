@@ -21,8 +21,8 @@
 
 \begin{document}
 
-\title{Learning-Free 3D Car Shapes from a Single Roadside Video}
-\titlerunning{Learning-Free 3D Car Shapes from a Roadside Video}
+\title{Learning-Free 3D Triangulation of Moving Objects from a Single Roadside Camera}
+\titlerunning{Learning-Free 3D Triangulation from a Roadside Camera}
 \author{Dmitriy Zhuravlev}
 \authorrunning{D. Zhuravlev}
 \institute{T. Shevchenko National University, Kyiv, Ukraine\\
@@ -134,8 +134,12 @@ with yaw change $\theta_j$, translation $\vect{t}_j \in \R^2$ and the car's cent
 % ------------------------------------------------------------------------------------------------------------------
 \section{Method}
 
-Figure~\ref{fig:pipeline} shows the pipeline, Fig.~\ref{fig:overview} the first steps on one frame and
-Fig.~\ref{fig:steps} a car from its triangulation to its model.
+The method has five steps (Fig.~\ref{fig:pipeline}). The masks and cuboids of the moving objects come from known
+methods (Sect.~\ref{sec:input}, Fig.~\ref{fig:overview} top); the orientation of every object comes from its motion
+(Sect.~\ref{sec:heading}, Fig.~\ref{fig:heading}); its visible surface is triangulated in 3D in short windows of the
+video (Sect.~\ref{sec:window}, Fig.~\ref{fig:overview} bottom); the windows of one object are solved together as one
+rigid body (Sect.~\ref{sec:fusion}); and what the camera never sees is completed from symmetry, the masks and the
+cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:system} collects the equations solved.
 
 \begin{figure}[t]
 \centering
@@ -144,10 +148,10 @@ Fig.~\ref{fig:steps} a car from its triangulation to its model.
   box/.style={draw, rounded corners=2pt, align=center, minimum height=11mm, text width=24mm, fill=#1},
   box/.default=white, arr/.style={-{Stealth[length=2mm]}, thick}]
   \node[box=gray!10] (video) {video of a fixed,\\ calibrated camera};
-  \node[box=blue!8, right=of video] (seg) {masks and\\ cuboids of moving\\ objects (any source)};
+  \node[box=blue!8, right=of video] (seg) {masks and\\ cuboids of moving\\ objects (known\\ methods)};
   \node[box=blue!8, right=of seg] (mesh) {surface mesh,\\ tracks $\pm 8$ frames};
   \node[box=blue!8, right=of mesh] (solve) {joint solve:\\ motion + depth\\ per vertex; scale\\ from the cuboid};
-  \node[box=orange!10, below=9mm of solve] (track) {tracks; all windows\\ as one rigid body};
+  \node[box=orange!10, below=9mm of solve] (track) {heading from\\ motion; all windows\\ as one rigid body};
   \node[box=orange!10, left=of track] (sym) {symmetry plane,\\ weighted-median\\ height field};
   \node[box=orange!10, left=of sym] (hull) {visual hull of the\\ masks, roof edge,\\ cuboid};
   \node[box=gray!10, left=of hull] (model) {car model:\\ Poisson surface\\ + video colours};
@@ -172,28 +176,77 @@ solved in 3D.}
 \label{fig:overview}
 \end{figure}
 
-\subsection{One window: motion and depth of the visible body}\label{sec:window}
+\subsection{Masks and cuboids}\label{sec:input}
 
-\paragraph{Input.} For every moving object the method takes its mask and its 3D cuboid (centre on the road, heading,
-length, width and height) in the frames that see it, linked into tracks. It does not prescribe their source. A fully
-automatic front end, which we use on the moving camera (Sect.~\ref{sec:results}), is the following. The background
-is the per-pixel median of the video. A frame's foreground blobs are cut at the contact line below which a wet road
-mirrors the car, split into separate objects by clustering the optical flow \cite{farneback,moving_orig}, and freed
-of the cast shadow by a brightness/saturation test; blobs whose mean flow is below $1.5$~px per frame are stopped and
-are skipped, as without motion there is no parallax. The blob's footprint on the road gives a cuboid by IPM
-\cite{lift,efficient_orig}; vanishing-point calibration gives one as well \cite{dubska2014,dubska2015}. To separate
-the errors of the triangulation from those of detection and tracking, the experiments and illustrations below use a
-more precise input\footnote{The masks come from a promptable segmenter, SAM~2.1 \cite{sam2}, prompted by the
-labelled 2D boxes of the dataset; the cuboids are fitted to each object's LiDAR points in the frames with a scan and
-interpolated in between. This input is thus based on annotation; the method itself uses only the masks and the
-cuboids, as described in this section.}.
+\paragraph{Sources.} For every moving object the method takes its mask and its 3D cuboid (centre on the road, heading,
+length, width and height) in the frames that see it, linked into tracks. It does not prescribe their source: masks
+come from background subtraction and optical-flow clustering \cite{farneback,moving_orig} or from a segmenter, cuboids
+from the footprint on the road \cite{lift,efficient_orig}, from vanishing-point calibration \cite{dubska2014,dubska2015}
+or from a LiDAR. To separate the errors of the triangulation from those of detection and tracking, all experiments on
+the fixed cameras use precise masks and cuboids\footnote{The masks come from a promptable segmenter, SAM~2.1
+\cite{sam2}, prompted by the labelled 2D boxes of the dataset; the cuboids are fitted to each object's LiDAR points in
+the frames with a scan and interpolated to the camera's clock in between. This input is thus based on annotation; the
+method itself uses only the masks and the cuboids, as described in this section.}; an automatic front end, used on
+the moving camera, is described below. A window is built at every frame in which the object's
+mask covers at least 55\,\% of its projected cuboid, i.e.\ where it is neither occluded nor cut by the image border. The method uses the cuboid's position and size; its heading serves only to
+decide which triangulated points lie inside it (Sect.~\ref{sec:window}), and the orientation of the object comes
+from its motion (Sect.~\ref{sec:heading}).
 
-\paragraph{The surface and its mesh.} The mask of the reference frame receives a dense set of vertices ---
-Shi--Tomasi corners \cite{shitomasi}, a regular grid of at most 5~px (at least 400 vertices per object) and points
-2~px inside its outline --- and is triangulated by Delaunay. (With the automatic front end, whose blobs include
-shadow and blur, only the \emph{body} is meshed: the blob's pixels clustered by colour, $k$-means with $k = 3$ in CIE
-Lab, the largest cluster and the clusters within $\Delta E \le 20$ of it.) Every vertex is tracked through the window of $\pm 8$ frames with pyramidal Lucas--Kanade \cite{lucas_kanade}
-and a forward--backward check; long tracks of near, fast cars are cut at 100~px of image motion.
+\paragraph{An automatic front end.} The masks and cuboids can also be obtained without annotation; we use the
+following on the moving camera (Sect.~\ref{sec:results}). The background is the per-pixel median of the video; a
+frame's foreground blobs are cut at the contact line below which a wet road mirrors the car, split into separate
+objects by clustering the optical flow \cite{farneback,moving_orig}, and freed of the cast shadow by a
+brightness/saturation test. Blobs whose mean flow is below $1.5$~px per frame are skipped, as without motion there is
+no parallax. Such a blob still contains shadow and blur at its bottom, so only the painted \emph{body} is meshed (the
+blob's pixels clustered by colour, $k$-means with $k = 3$ in CIE Lab, the largest cluster and those within
+$\Delta E \le 20$ of it), and the anchor of Eq.~(\ref{eq:energy}) puts the body's lower edge --- the lowest vertex in
+each of 8 slices along it --- at its height above the road instead of the tyres at zero: 0.45~m in a first pass, the
+value of the car's body type in a second (sedan and hatchback 0.40, SUV 0.52, van 0.48~m), as no cuboid gives the
+ground clearance. The cuboid is the blob's footprint on the road by IPM \cite{lift,efficient_orig}; objects are linked
+from window to window by the Hungarian method \cite{kuhn} on their road positions, predicted with their solved
+velocity, inside a gate of $2.5~\text{m} + 4\,\%$ of the range. The silhouettes are snapped to the image edges (every
+contour point moves up to $\pm 3$~px along its normal to the strongest gradient, as an active contour would
+\cite{snakes}), vote with $95\,\%$, and the hull is capped at 1.9~m.
+
+\subsection{Orientation from motion}\label{sec:heading}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{heading.png}
+\caption{Orientation from motion, intersection A. (a) The path of every car and its heading from the track solve
+(blue arrows), with the cuboids fitted to the cars' LiDAR (grey, evaluation only); (b) a turning car up close. The
+heading follows the direction of travel through the turn; median error against the labelled yaw $4.6^\circ$ over
+the 24 cars of A.}
+\label{fig:heading}
+\end{figure}
+
+\paragraph{Heading.} The orientation of a car is never fitted to its shape, nor taken from its cuboid; it comes from
+its motion, as a car drives along its heading. In a window, the yaw changes $\theta_j$ are unknowns of Eq.~(\ref{eq:energy}), started from a RANSAC
+Procrustes fit of the lowest vertices; the window's velocity is the solved translation per frame. Over the track,
+these velocities are smoothed by a quadratic in time, and the heading of each window is the direction of the smoothed
+velocity,
+\begin{equation}
+  \psi_w = \operatorname{atan2}\big(\bar v_{w,y},\, \bar v_{w,x}\big),
+  \label{eq:heading}
+\end{equation}
+for the smoothed velocity $\bar{\vect{v}}_w$ at the window's reference frame (the tangent of the smoothed path of the
+footprint where the car barely moves, below 5~cm per frame). This
+heading starts the track solve, whose pose $\vect{Q}_g = (\phi_g, \vect{p}_g)$ then gives the car's heading
+$\phi_g$ in every frame; the fifth term of Eq.~(\ref{eq:energy}) keeps it along the direction of travel. 
+
+\paragraph{The car's box.} The car
+frame has its $x$ axis along $\phi_g$, and the model is built in it, so the car's bounding box is aligned with the
+heading: its length and width are the extents of the occupied height-field columns along $x$ and $y$, its height the
+98th percentile of the column heights. A car that turns is therefore boxed along its momentary direction of travel. Figure~\ref{fig:heading} shows the paths and headings of the cars of A; the heading
+errors of all datasets are given in Sect.~\ref{sec:results}.
+
+\subsection{Triangulation of one window}\label{sec:window}
+
+\paragraph{The surface and its mesh.} The mask of the reference frame, eroded by 2~px so that no vertex lies on its
+outline, receives a regular grid of vertices every 5~px (thinned to at most 900), triangulated by Delaunay. Every vertex
+is tracked through the window of $\pm 8$ frames with pyramidal Lucas--Kanade \cite{lucas_kanade} and a
+forward--backward check, and kept if it is followed in at least six frames and 60\,\% of them; long tracks of near, fast cars
+are cut at 100~px of image motion.
 
 \paragraph{Joint solve.} The unknowns are the motion $\vect{m}_j = (\theta_j, \vect{t}_j)$ of the car in every frame
 of the window ($\vect{m}_r = 0$ in the reference frame $r$) and the depth $s_i$ of every vertex along its reference
@@ -201,7 +254,7 @@ ray, $\vect{X}_i = \vect{C} + s_i \vect{d}_i$. They minimise
 \begin{align}
   E = &\sum_{i,j} \big\| \pi_j\big(\mathcal{M}_j(\vect{X}_i)\big) - \vect{u}_{ij} \big\|^2
       + \lambda \sum_{(a,b)} w_{ab} \|\vect{n}_a - \vect{n}_b\|^2
-      + W_a \sum_{i \in \mathcal{L}} (X_{i,z} - h_r)^2 \nonumber\\
+      + W_a \sum_{i \in \mathcal{L}} X_{i,z}^2 \nonumber\\
       &+ W_m \sum_j \|\vect{m}_{j-1} - 2\vect{m}_j + \vect{m}_{j+1}\|^2_{\Sigma}
       + W_h \sum_j \big( \vect{u}^\perp \cdot \vect{R}(-\bar\theta_j)(\vect{t}_{j+1} - \vect{t}_j) \big)^2 .
   \label{eq:energy}
@@ -210,48 +263,55 @@ with every squared residual $r^2$ entering through the robust soft-$\ell_1$ loss
 which grows only linearly for large residuals. The first term is the reprojection error of the tracked vertices. The
 second makes the normals $\vect{n}_a,
 \vect{n}_b$ of triangles sharing an edge agree, with weight $w_{ab} = 1$ inside a colour region and $0.3$ across a
-colour edge, so that panels stay smooth and creases follow paint and trim lines. The third places the body's lower
-edge on its height above the road, $h_r$ (set below): $\mathcal{L}$ holds the lowest vertex in each of 8 slices along the body,
-so that the edge is anchored along its whole length and not at one end; this anchor fixes the scale. The fourth is
+colour edge, so that panels stay smooth and creases follow paint and trim lines. The third puts the tyres on the
+road: $\mathcal{L}$ holds the vertices on the mask's bottom row, where the tyres touch the road (within
+$\max(3~\text{px}, 6\,\%)$ of the mask's height of it); vertices more than 2~px below that row belong to the mirror
+image on a wet road and are kept below the road ($-3.2 \le z \le 0$). The fourth is
 temporal smoothness of the motion, with $\|\vect{m}\|^2_{\Sigma} = (8\,\text{m}\cdot\theta)^2 + \|\vect{t}\|^2$, so that
 one radian of yaw weighs like 8~m of translation; the fifth forbids a sideways step: a car moves along its heading ($\vect{u}^\perp$
 is the normal of the initial direction of travel, $\bar\theta_j$ the mean yaw of the step). Both motion priors are
 divided by the length of the path, so that they do not favour a smaller copy of the car closer to the camera, which
-would move less. Every vertex is bounded to $0 \le z \le 3.2$~m and the lower-edge vertices to $h_r \pm 0.1$~m.
+would move less. Every other vertex is bounded to $0 \le z \le 3.2$~m.
 
 The motion is initialised by a RANSAC Procrustes fit \cite{fischler_bolles_ransac} of the IPM points of the lowest
-vertices, frame to frame, smoothed by a quadratic in time; the yaw change follows the direction of the path. The
+vertices (the lowest 30\,\% of the mask, at least eight), frame to frame, smoothed by a quadratic in time; the yaw change follows the direction of the path. The
 depths start at the intersection of each vertex's rays under that motion. After the solve, vertices whose residual
 exceeds $\max(1.5~\text{px}, 2.5 \times \text{median})$ --- background dragged along by the tracker at the outline,
 or another car --- are removed and the solve is repeated (two rounds).
 
-The body height $h_r$ is $0.45$~m in a first pass over the video; the second pass uses the value of each car's body
-type from the first pass's models (sedan and hatchback $0.40$, SUV $0.52$, van $0.48$~m).
-
 \paragraph{Scale from the cuboid.} A fixed camera sees a window and the same window scaled about the camera centre
 identically in every frame, since the motion and the depths scale alike: the images fix the shape, not the scale. The
-road anchor guesses the scale, but at 60--70~m a few per cent of scale move the object by metres. The window is
+tyres on the road fix it, but at 60--70~m a pixel of the contact row moves the object by decimetres. The window is
 therefore scaled about the camera centre by the factor in $[0.8, 1.2]$ that puts the most vertices inside its cuboid
 (with a margin of 15~cm), and vertices more than 1.0~m beyond the cuboid along the object and 0.8~m across it, or
 outside the mask in the reference frame, are dropped as depth outliers along the ray. The cuboid fixes where the
 object is and how large; its shape still comes from the triangulation.
 
-\subsection{The whole video: one model per car}\label{sec:fusion}
+\subsection{One rigid body per track}\label{sec:fusion}
 
-\paragraph{Tracks.} A window is reconstructed at every frame of a track. The windows of one object are linked by the
-track identities of the input; without them (the automatic front end, a window every second frame) the objects of
-successive windows are linked by the Hungarian method \cite{kuhn} on their road positions, predicted with their solved
-velocity, inside a gate of $2.5~\text{m} + 4\,\%$ of the range. Tracks of fewer than 5 windows are dropped.
+\paragraph{Tracks.} The windows of one object are linked by the track identities of the input. Tracks of fewer than
+5 windows are dropped.
 
 \paragraph{One rigid car per track.} Each window has solved its own motion, so two windows of the same car disagree
 on where the car is when they overlap in time. We therefore solve all windows of a track together, as rigid structure
 from motion of one moving object \cite{ozden2010}: one planar pose $\vect{Q}_g = (\phi_g, \vect{p}_g)$ of the car per
 frame $g$, shared by every window that sees frame $g$, and the depths of all windows' vertices. A vertex of window $w$,
 a point $\vect{X}$ in the world at the window's reference frame $r_w$, is at
-$\vect{R}(\phi_g - \phi_{r_w})(\vect{X}_{xy} - \vect{p}_{r_w}) + \vect{p}_g$ in frame $g$. The energy is that of
-Eq.~(\ref{eq:energy}) summed over the windows --- reprojection, surface smoothness and the body-edge anchors of every
-window --- with the motion terms on the shared poses of the whole track; one pose is held fixed, which removes the
-gauge freedom (a common planar motion of all poses and points). The solve starts from a chain: the middle window's pose comes from the
+$\vect{X}^{(g)} = \big(\vect{R}(\phi_g - \phi_{r_w})(\vect{X}_{xy} - \vect{p}_{r_w}) + \vect{p}_g,\; X_z\big)$ in
+frame $g$. The energy is that of Eq.~(\ref{eq:energy}) summed over the windows, with the motion terms on the shared
+poses of the whole track:
+\begin{align}
+  E_{\text{track}} = &\sum_{w} \Big[ \sum_{i \in w} \sum_{g} \rho\Big(\big\| \pi_g\big(\vect{X}_i^{(g)}\big) - \vect{u}_{ig}
+      \big\|^2\Big) + \lambda \sum_{(a,b) \in w} w_{ab} \|\vect{n}_a - \vect{n}_b\|^2
+      + W_a \sum_{i \in \mathcal{L}_w} X_{i,z}^2 \Big] \nonumber\\
+    &+ W_m \sum_g \big\|\vect{Q}_{g-1} - 2\vect{Q}_g + \vect{Q}_{g+1}\big\|^2_{\Sigma}
+      + W_h \sum_g \big( \vect{n}(\bar\phi_g) \cdot (\vect{p}_{g+1} - \vect{p}_g) \big)^2 ,
+  \label{eq:track}
+\end{align}
+over the poses $\vect{Q}_g$ and the depths $s_i$ of all vertices ($\vect{X}_i = \vect{C} + s_i \vect{d}_i$ along the
+reference ray of its window), where $\vect{n}(\phi) = (-\sin\phi, \cos\phi)$ is the car's lateral direction and
+$\bar\phi_g$ the mean heading of the step, and with the weights and bounds of the windows. One pose is held fixed,
+which removes the gauge freedom (a common planar motion of all poses and points). The solve starts from a chain: the middle window's pose comes from the
 smoothed path of the track, and each window places the reference frame of its neighbour through its own solved
 motion, so that the start agrees with every window's points (0.3--0.5~px). The vertices on the outline of a window's
 triangulation are left out: the tracker follows the moving edge of the car's mask there, not a point of its surface,
@@ -260,16 +320,17 @@ left, $z$ up) through the shared pose of its reference frame, with no further al
 were aligned to each other by a trimmed planar ICP \cite{icp}; along the car's own axis the point cloud is
 self-similar, and the alignment slid.
 
-\paragraph{Heading and the car's box.} The orientation of a car is never fitted to its shape; it comes from its
-motion. In a window, the yaw changes $\theta_j$ are unknowns of Eq.~(\ref{eq:energy}), started from a RANSAC
-Procrustes fit of the lowest vertices; the window's velocity is the solved translation per frame. Over the track,
-these velocities are smoothed by a quadratic in time, and the heading of each window is the direction of the smoothed
-velocity (the tangent of the smoothed path of the footprint where the car barely moves, below 5~cm per frame). This
-heading starts the track solve, whose pose $\vect{Q}_g = (\phi_g, \vect{p}_g)$ then gives the car's heading
-$\phi_g$ in every frame; the fifth term of Eq.~(\ref{eq:energy}) keeps it along the direction of travel. The car
-frame has its $x$ axis along $\phi_g$, and the model is built in it, so the car's bounding box is aligned with the
-heading: its length and width are the extents of the occupied height-field columns along $x$ and $y$, its height the
-98th percentile of the column heights. A car that turns is therefore boxed along its momentary direction of travel.
+\subsection{Completion of what the camera does not see}\label{sec:completion}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{method_steps.png}
+\caption{From triangulation to model, three cars of intersection A. Left: the body triangulation in one frame.
+Middle: the same triangles in 3D after the window's joint solve, from a new viewpoint --- one window is noisy along
+the viewing rays. Right: the model fused over all windows of the car (one rigid car, symmetry, weighted-median height
+field, cabin from silhouettes, Poisson surface, video colours), from the same viewpoint.}
+\label{fig:steps}
+\end{figure}
 
 \paragraph{Symmetry.} The symmetry plane $y = y_0$ maximises the share of points whose mirror image has a neighbour
 within 12~cm \cite{mitra2006}; the points are re-centred on it and used together with their mirror images, which
@@ -283,27 +344,32 @@ cross-section are dropped: the true surface collects points from every window, t
 them thin. A $3 \times 3$ median filter and the largest connected component finish the field.
 
 \paragraph{Cabin from the masks.} The triangulated field covers the textured surface; windows and roof are often too
-dark or too uniform to track. The silhouette of the object in every window is its mask. Voxels of 10~cm are kept if
-they, and their mirror images, project inside the mask in at least $75\,\%$ of the windows that see them (a visual
+dark or too uniform to track. The silhouette of the object in every frame is its mask; the masks of the frames in
+which the object is at least 60\,\% visible (unoccluded and inside the image) carve. Voxels of 10~cm are kept if
+they, and their mirror images, project inside the mask in at least $75\,\%$ of the frames that see them (a visual
 hull \cite{laurentini}); the top of the kept voxels is the cabin field, and the model is the higher of the
-triangulated and cabin fields. A high camera sees a car from nearly the same direction in all windows, so the cone of
+triangulated and cabin fields. A high camera sees a car from nearly the same direction in all frames, so the cone of
 one silhouette is long along the viewing ray and rises toward the camera; the hull is therefore capped at the
-cuboid's height plus 0.4~m. For objects nearer than 40~m the silhouettes alone are used. (The automatic silhouettes,
-background subtraction with the reflection and the shadow removed, are first snapped to the image edges: every
-contour point moves up to $\pm 3$~px along its normal to the strongest gradient, as an active contour would
-\cite{snakes}; they vote with $95\,\%$, and the hull is capped at 1.9~m.)
+cuboid's height plus 0.4~m. For objects nearer than 40~m the silhouettes alone are used.
 
 \paragraph{Roof from the far edge.} The camera is above the car, so the top edge of a silhouette is the \emph{far}
 edge of the roof, and the visual hull lets the near half of the roof rise by about $\tfrac{W}{2}\tan\epsilon$ above
 it, for the width $W$ and the camera's elevation angle $\epsilon$. The roof height $r(x)$ at each position $x$ along
 the car is therefore measured where it is seen: in every frame, the vertical segment at $x$ on the far side of the
 car (at $40\,\%$ of the cuboid's width off the symmetry plane) is projected, and $r(x)$ is the height at which it
-leaves the mask through its top edge. The median over the frames (at least three) caps the height field.
+leaves the mask through its top edge. The median over the frames (at least three) caps the height field. This holds
+where the viewing ray runs along the car --- a car seen only from behind, whose hull overshoots by about
+$\tfrac{L}{2}\tan\epsilon$ --- and the cap is applied only to cars never seen side-on. Seen side-on, the top edge of
+the mask is the crown of the rounded roof rather than its far edge; capped there, the cars of A came out 0.20~m below
+their LiDAR instead of 0.10~m.
 
 \paragraph{Body type, width and length.} The side profile of the car's silhouette in its most side-on windows gives
 scale-free features (length to height, share of the length under the roof, height of the front and rear fifths) and
-a type by fixed rules: sedan, hatchback, SUV or van. For a car seen from the side the width lies nearly along the viewing ray, where a single camera measures it worst; the width is therefore bounded by the type's typical width
-(sedan 1.90, hatchback 1.85, SUV 1.95, van 2.05~m). The length is measured only where the car is seen side-on: a
+a type by fixed rules: sedan, hatchback, SUV or van. For a car seen from the side the width lies nearly along the
+viewing ray, where a single camera measures it worst; the width is therefore bounded about the symmetry plane by the
+type's typical width with its mirrors (sedan 1.90, hatchback 1.85, SUV 1.95, van 2.05~m). Bounding it by the cuboid's
+width instead scored lower against the LiDAR on A ($-0.021$) and B ($-0.003$): a cuboid fitted to the body leaves
+out the mirrors, which the LiDAR sees. The length is measured only where the car is seen side-on: a
 window with $|\sin(\text{heading} - \text{viewing ray})| \ge 0.5$ sees the length across the ray. A car seen side-on in
 fewer than two windows --- most often a car seen only from behind --- has a length and a profile the video never
 measured, only a silhouette cone that is long along the ray. It is completed from its cuboid: the footprint of the
@@ -331,6 +397,30 @@ tens of pixels, and without this the glass lands on the bonnet. A vertex and its
 the two. A vertex no window sees takes, near a seen vertex (0.3~m), that vertex's colour; farther, below the belt line
 one body colour, the median of the seen vertices between 30\,\% of the height and the belt line, and above it the
 median colour of the seen vertices at the same height --- glass at window height, paint on the roof.
+
+\subsection{The system of equations}\label{sec:system}
+
+For one object, with masks $M_g$ and cuboids $B_g$ in its frames $g$, the method solves in turn:
+\begin{enumerate}
+\item \emph{each window} $w$ (reference frame $r_w$, frames $r_w \pm 8$): Eq.~(\ref{eq:energy}) over the motion
+  $\vect{m}_j$ and the depths $s_i$ of the vertices, with $0 \le X_{i,z} \le 3.2$~m ($-3.2 \le X_{i,z} \le 0$ for the
+  mirror image on a wet road), started from the IPM of the lowest vertices;
+\item \emph{its scale}: $\sigma_w = \arg\max_{\sigma \in [0.8, 1.2]} \big|\{ i : \vect{C} + \sigma (\vect{X}_i - \vect{C})
+  \in B_{r_w} \oplus 0.15~\text{m} \}\big|$, every vertex then moved to $\vect{C} + \sigma_w (\vect{X}_i - \vect{C})$,
+  and the vertices more than 1.0~m beyond $B_{r_w}$ along the object or 0.8~m across it, or outside $M_{r_w}$,
+  dropped;
+\item \emph{the heading} of each window from the motion, Eq.~(\ref{eq:heading});
+\item \emph{the track}: Eq.~(\ref{eq:track}) over the poses $\vect{Q}_g$ and all depths $s_i$, started from the chain
+  of windows and the headings;
+\item \emph{the shape} in the car frame: the height field $H$, the weighted median over the windows of the highest
+  point per column, mirrored about the symmetry plane; the cabin $H_c$, the top of the voxels that project into the
+  masks of at least 75\,\% of the frames, mirrored, capped at the cuboid's height plus 0.4~m; the model $\max(H, H_c)$,
+  capped by the roof line $r(x)$ and completed from the cuboid where the car was never seen side-on, and bounded by the
+  width.
+\end{enumerate}
+Steps 1 and 4 are non-linear least squares; every residual enters through the soft-$\ell_1$ loss, and they are solved
+by a trust-region method with bounds and a sparse Jacobian, with $\lambda = 10$, $W_a = 30$, $W_m = 20$ and $W_h = 30$
+(residuals in pixels and metres). Steps 2, 3 and 5 are closed-form or a one-dimensional search.
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Evaluation Protocol}\label{sec:protocol}
@@ -424,16 +514,6 @@ $8.6^\circ$ and $6.0^\circ$.
 Refining each window's pose to its silhouette, which we tried on an earlier version, raised the image overlap (mask
 IoU 0.545 to 0.591) but moved the cars further from their labelled positions along the ray, because the silhouettes
 include shadows, reflections and neighbours.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{method_steps.png}
-\caption{From triangulation to model, three cars of intersection A. Left: the body triangulation in one frame.
-Middle: the same triangles in 3D after the window's joint solve, from a new viewpoint --- one window is noisy along
-the viewing rays. Right: the model fused over all windows of the car (one rigid car, symmetry, weighted-median height
-field, cabin from silhouettes, Poisson surface, video colours), from the same viewpoint.}
-\label{fig:steps}
-\end{figure}
 
 \begin{figure}[t]
 \centering

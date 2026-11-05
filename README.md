@@ -1,4 +1,4 @@
-# Learning-Free 3D Car Shapes from a Single Roadside Video
+# Learning-Free 3D Triangulation of Moving Objects from a Single Roadside Camera
 
 <p align="center"><img src="figures/turntable.gif" width="560" alt="A reconstructed car model rotating"></p>
 
