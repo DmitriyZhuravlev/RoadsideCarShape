@@ -606,20 +606,23 @@ points. A person or a cyclist is thin and partly non-rigid: the swinging legs an
 the rigid triangulation. A bicycle and its rider's body are rigid enough for it: the carve of the masks, mirrored
 about the centre plane, is bounded along the line of sight by the surface triangulated over the whole pass. A walking
 person gives almost no rigid points, and the model is the symmetric carve of the masks alone. Fig.~\ref{fig:vru}
-shows two pedestrians and a cyclist: the cyclist reaches a solid IoU of 0.67 against its accumulated LiDAR, the
+shows two pedestrians, a cyclist and a motorcyclist: the cyclist reaches a solid IoU of 0.67 against its accumulated
+LiDAR, the motorcyclist, seen from behind, 0.73 (1.90$\times$0.94$\times$1.50~m against the LiDAR box's
+1.84$\times$0.83$\times$1.49~m; there the carve alone, 0.73, is ahead of the carve bounded by the surface, 0.71), the
 pedestrians 0.57 and 0.41, at the right height (1.98 and 1.68~m against LiDAR boxes 1.86 and 1.65~m tall). Seen from
 the side, a person cannot be narrowed along the line of sight by the masks, and the pedestrians come out 0.7~m deep
 across their walk, against 0.6~m for the LiDAR box; an anthropometric width profile narrows them but lowers the IoU
 (0.47 and 0.32), so we do not use it. A second cyclist reaches 0.69, though its mask takes in the courier box of
-the scooter beside it, and a motorcyclist seen from behind 0.73; a pedestrian under an umbrella fails (0.22), as the
+the scooter beside it; a pedestrian under an umbrella fails (0.22), as the
 umbrella hides the upper body in every frame.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=\textwidth]{vru_compare.png}
-\caption{Two pedestrians and a cyclist of V2X-Seq-SPD. Per row: a frame of the video; the SAM~2.1 mask prompted by the
+\caption{Two pedestrians, a cyclist and a motorcyclist of V2X-Seq-SPD. Per row: a frame of the video; the SAM~2.1 mask prompted by the
 labelled 2D box; the cuboid fitted to the object's LiDAR; the model as the camera saw it and turned by 90$^\circ$.
-Pedestrians: the symmetric carve of the masks; cyclist: the carve bounded by its triangulated surface. Below each
+Pedestrians and the motorcyclist, seen from behind: the symmetric carve of the masks; cyclist: the carve bounded by
+its triangulated surface. Below each
 row: the solid IoU against the object's accumulated LiDAR and the size of the model and of the LiDAR box.}
 \label{fig:vru}
 \end{figure}

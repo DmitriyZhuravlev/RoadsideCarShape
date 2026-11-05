@@ -1,12 +1,15 @@
-"""Pedestrians and cyclists for the article, on the precise input: frame | SAM 2.1 mask | LiDAR box | the model as the
-camera saw it | turned 90 deg (the row images of vru_lidar.py). Pedestrians: carve with symmetry only; cyclists: carve
-bounded by the surface triangulated over the pass (tri_vru.py, OCC_OVERRIDE)."""
+"""Pedestrians, a cyclist and a motorcyclist for the article, on the precise input: frame | SAM 2.1 mask | LiDAR box |
+the model as the camera saw it | turned 90 deg (the row images of vru_lidar.py). Pedestrians: carve with symmetry only;
+the cyclist: carve bounded by the surface triangulated over the pass (tri_vru.py, OCC_OVERRIDE); the motorcyclist, seen
+from behind: carve."""
 import os, re
 import cv2, numpy as np
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs/vru_precise")
 ROWS = [("seq_0077_000118/carve/vru_000118.jpg", "seq_0077_000118/carve.log"),
         ("seq_0059_003926/carve/vru_003926.jpg", "seq_0059_003926/carve.log"),
-        ("seq_0059_003897/tri/vru_003897.jpg", "seq_0059_003897/final.log")]
+        ("seq_0059_003897/tri/vru_003897.jpg", "seq_0059_003897/final.log"),
+        ("seq_0059_003949/carve/vru_003949.jpg", "seq_0059_003949/carve.log")]   # motorcyclist from behind: the carve
+                                                                                   # alone (0.73) beats carve + surface (0.71)
 # (cyclist 003765 of seq_0063 left out: its mask takes in the courier box of the scooter beside it)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures", "vru_compare.png")
 rows = []
