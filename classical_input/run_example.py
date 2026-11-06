@@ -10,6 +10,7 @@ the figures. Writes to out/:
   background.png      the mean of the whole video (half resolution)
   steps.png           the steps on one frame; frames.png  masks and cuboids on several frames
   metrics.json        the comparison with the labels
+  video.mp4, .gif     the clip with masks, cuboids and track ids
 """
 import json
 import os
@@ -24,6 +25,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 import camera
+import foreground
 import ofc
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
@@ -31,6 +33,7 @@ ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
 FIRST = int(sys.argv[2]) if len(sys.argv) > 2 else 20
 N = int(sys.argv[3]) if len(sys.argv) > 3 else 25
 SHOW = 10              # the frame of the clip shown step by step
+FG = os.environ.get("FG", "gsoc")   # foreground: mean, median, gsoc, lsbp (foreground.py)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 EDGES = [(0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7)]
 COLOURS = plt.get_cmap("tab10").colors
@@ -43,8 +46,11 @@ def colour(i):
 def draw_cuboid(img, cam, o, col, th=2):
     uv = cam.project(ofc.corners(o["centre"], o["yaw"], *o["lwh"]))
     for a, b in EDGES:
-        if np.isfinite(uv[[a, b]]).all():
-            cv2.line(img, tuple(np.round(uv[a]).astype(int)), tuple(np.round(uv[b]).astype(int)), col, th, cv2.LINE_AA)
+        if np.isfinite(uv[[a, b]]).all() and np.abs(uv[[a, b]]).max() < 1e6:
+            ok, p, q = cv2.clipLine((0, 0, img.shape[1], img.shape[0]), tuple(np.round(uv[a]).astype(int)),
+                                    tuple(np.round(uv[b]).astype(int)))
+            if ok:
+                cv2.line(img, p, q, col, th, cv2.LINE_AA)
 
 
 def overlay(img, cam, objs):
@@ -55,10 +61,9 @@ def overlay(img, cam, objs):
     for o in objs:
         draw_cuboid(out, cam, o, colour(o["track"]))
         x0, y0 = int(o["box"][0]), int(o["box"][1])
-        cv2.putText(out, f'{o["track"]} {o["track_type"]}', (x0, max(18, y0 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    (255, 255, 255), 4, cv2.LINE_AA)
-        cv2.putText(out, f'{o["track"]} {o["track_type"]}', (x0, max(18, y0 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    colour(o["track"]), 2, cv2.LINE_AA)
+        tag = f'{o["track"]} {o["track_type"]}' + (" (track)" if o.get("predicted") else "")
+        cv2.putText(out, tag, (x0, max(18, y0 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 4, cv2.LINE_AA)
+        cv2.putText(out, tag, (x0, max(18, y0 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, colour(o["track"]), 2, cv2.LINE_AA)
     return out
 
 
@@ -160,8 +165,8 @@ def figures(cam, fids, frames, results, debug, labs, show, bg):
     for i, m in enumerate(dbg["segments"]):
         segs[m] = pal[i % 20]
     panels = [("(a) video frame", cv2.cvtColor(img, cv2.COLOR_BGR2RGB)),
-              ("(b) mean of the whole video (background)", cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)),
-              (f"(c) foreground: differs from the mean by > {ofc.FG_DIFF}", fg),
+              (f"(b) background model ({FG})", cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)),
+              (f"(c) foreground ({FG})", fg),
               (f"(d) colour segmentation of the frame (k-means, k = {ofc.K_COLOUR}, Lab)",
                pal[dbg["colour_labels"] % 20]),
               ("(e) optical flow in HSV (hue: direction, value: magnitude)", hsv),
@@ -211,24 +216,40 @@ def bev(a, objs, labs):
                 loc="left")
 
 
+def video(cam, fids, frames, results):
+    """The clip with masks, cuboids and track ids: out/video.mp4 (half resolution, 10 fps) and out/video.gif."""
+    from PIL import Image
+    h, w = frames[0].shape[:2]
+    vw = cv2.VideoWriter(os.path.join(OUT, "video.mp4"), cv2.VideoWriter_fourcc(*"mp4v"), 10, (w // 2, h // 2))
+    gif = []
+    for fid, img, objs in zip(fids, frames, results):
+        o = overlay(img, cam, objs)
+        o[:72] = (0.35 * o[:72]).astype(np.uint8)        # a dark band under the caption
+        cv2.putText(o, f"frame {fid}   foreground: {FG}   cuboids: tangents of the silhouette (Dubska)   "
+                       f"(track): placed by its track", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2,
+                    cv2.LINE_AA)
+        vw.write(cv2.resize(o, (w // 2, h // 2), interpolation=cv2.INTER_AREA))
+        gif.append(Image.fromarray(cv2.cvtColor(cv2.resize(o, (w // 3, h // 3), interpolation=cv2.INTER_AREA),
+                                                cv2.COLOR_BGR2RGB)))
+    vw.release()
+    gif[0].save(os.path.join(OUT, "video.gif"), save_all=True, append_images=gif[1:], duration=100, loop=0)
+
+
 def main():
     fids = sorted(f[:-4] for f in os.listdir(os.path.join(ROOT, "image")))
     cam = camera.Camera(ROOT, fids[FIRST])
     print(f"road plane: camera {cam.height:.2f} m above the road")
     clip = fids[FIRST:FIRST + N]
-    cache = os.path.join(OUT, "background.png")
-    if os.path.exists(cache):
-        bg = cv2.imread(cache)
-    else:
-        bg = ofc.mean_background([os.path.join(ROOT, "image", f + ".jpg") for f in fids])
-        os.makedirs(OUT, exist_ok=True)
-        cv2.imwrite(cache, bg)
-    print(f"mean background of {len(fids)} frames")
+    fgs, bg = foreground.masks(FG, [os.path.join(ROOT, "image", f + ".jpg") for f in fids],
+                               set(range(FIRST, FIRST + N)))
+    os.makedirs(OUT, exist_ok=True)
+    cv2.imwrite(os.path.join(OUT, "background.png"), bg)
+    print(f"foreground: {FG}, background model of {len(fids)} frames")
     prev = cv2.imread(os.path.join(ROOT, "image", fids[FIRST - 1] + ".jpg"))
     frames, results, debug = [], [], []
-    for fid in clip:
+    for k, fid in enumerate(clip):
         img = cv2.imread(os.path.join(ROOT, "image", fid + ".jpg"))
-        objs, dbg = ofc.detect(cam, prev, img, bg)
+        objs, dbg = ofc.detect(cam, prev, img, bg, fgs[FIRST + k])
         frames.append(img)
         results.append(objs)
         debug.append(dbg if len(frames) == SHOW + 1 else None)     # the masks of every segment are large
@@ -243,6 +264,7 @@ def main():
     json.dump(metrics, open(os.path.join(OUT, "metrics.json"), "w"), indent=1)
     print(json.dumps(metrics, indent=1))
     figures(cam, clip, frames, results, debug, labs, show=SHOW, bg=bg)
+    video(cam, clip, frames, results)
 
 
 if __name__ == "__main__":

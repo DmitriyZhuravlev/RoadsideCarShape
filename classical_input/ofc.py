@@ -23,7 +23,8 @@ No step is learned. Per frame (Alg. 1 of the paper, with the segments of step 2 
   5. post-processing: an object's mask must be sufficiently convex, the footprints of two objects cannot intersect
      on the road, an object cut by the image border is skipped (its cuboid cannot fit inside its 2D box), two
      overlapping objects that move alike are merged if their union fits as well, and the mirror image of a car on the
-     wet road (directly below it, moving alike, its footprint touching the car's) is dropped.
+     wet road (directly below it, moving alike, its footprint touching the car's) is dropped; where an object's
+     silhouette borders an object in front of it, its tangents are left out (its ground contact is hidden).
 Over a clip, objects are linked into tracks by their footprint centres and each track keeps its most frequent type
 (the tracking and type persistence the paper proposes).
 """
@@ -47,7 +48,7 @@ SMALL = 0.02           # share of a car's image area at the segment's distance: 
 E_ACCEPT = 0.30        # an object whose measured size deviates more from every type's average (relative RMS) is
                        # rejected
 TANGENT_RMS = 0.30     # m: the six tangents disagree more (RMS): no box
-PRIOR_WEIGHT = 0.1     # weight of the type's average size against the tangents (both in m)
+PRIOR_WEIGHT = (0.1, 0.1, 0.1)   # weight of the type's average length, width, height against the tangents (m)
 MAX_MERGE = 40         # the segments are small now: a car is its body, windows, lights and tyres
 MERGE_ANGLE = 35.0     # deg: a neighbour moving in a direction farther from the object's is not merged
 SPEED_TOL = 0.05       # relative image speed two parts of one object may differ by, beyond the depth term ...
@@ -65,7 +66,8 @@ TRACK_MIN = 3          # objects per track for the track's heading and size
 REFLECTION_GAP = 1.0   # m: a mirror image below an object lifts to a footprint touching the object's
 CONTAINED = 0.7        # share of an object's 2D box inside a larger object's box that makes it a piece of that one
 MIRROR_NCC = 0.55      # the rows below a candidate contact line correlate this well with the rows above, mirrored:
-                       # the mask below it is the object's mirror image on the wet road
+                       # the mask below it is the object's mirror image on the wet road ...
+MIRROR_BLUR = 0.7      # ... if its edges are at most this share of those above (a reflection is blurred)
 TRACK_PATH = 1.5       # m: a track that moved less keeps its per-frame headings
 TRACK_SPEED = 0.3      # m/frame: slower along its path, an object keeps its flow's direction
 EXTRAP = 5             # frames a track is extrapolated beyond its ends to split a merged object
@@ -266,14 +268,17 @@ def tangent_box(cam, planes, ax, p, prior, lam=PRIOR_WEIGHT, fixed=None, iters=6
                     rows.append(row / s)
                     rhs.append(-d / s)
         R, y = np.array(rows).reshape(-1, 5), np.array(rhs)
+        if len(y) < (2 if fixed is not None else 4):     # too many sides hidden: the position is not determined
+            return None, np.inf
         if fixed is not None:
             l, w, h = fixed
             p0 = np.array([-l / 2, l / 2, -w / 2, w / 2, h])
             q = np.linalg.lstsq(R @ T, y - R @ p0, rcond=None)[0]
             p = T @ q + p0
         else:
-            P = np.array([[-1, 1, 0, 0, 0], [0, 0, -1, 1, 0], [0, 0, 0, 0, 1]], float) * lam
-            p = np.linalg.lstsq(np.r_[R, P], np.r_[y, lam * np.asarray(prior)], rcond=None)[0]
+            wl = np.asarray(lam, float).reshape(-1)[:, None] * np.ones((3, 1))   # per size: length, width, height
+            P = np.array([[-1, 1, 0, 0, 0], [0, 0, -1, 1, 0], [0, 0, 0, 0, 1]], float) * wl
+            p = np.linalg.lstsq(np.r_[R, P], np.r_[y, wl.ravel() * np.asarray(prior)], rcond=None)[0]
         if p[1] - p[0] < 0.1 or p[3] - p[2] < 0.1 or p[4] < 0.1:
             return None, np.inf
     return p, float(np.sqrt(np.mean((R @ p - y) ** 2))) if len(y) else np.inf
@@ -337,16 +342,22 @@ def union(segs, ids, shape):
 def contact_line(gray, m, x0, y0, x1, y1):
     """The row (half resolution) where the object meets the wet road: below it the image is the object mirrored
     (blurred). The row in the lower half of the box whose rows below correlate best with the rows above, mirrored,
-    inside the mask; None if no row correlates MIRROR_NCC or better."""
+    inside the mask, and have clearly weaker edges (MIRROR_BLUR; a far car's sharp wheels and sills below its body
+    line are not a reflection); None if no row correlates MIRROR_NCC or better."""
     H = y1 - y0
-    g = cv2.GaussianBlur(gray[y0:y1, x0:x1], (3, 3), 0).astype(np.float32)
+    raw = gray[y0:y1, x0:x1].astype(np.float32)
+    g = cv2.GaussianBlur(raw, (3, 3), 0)
     g -= g.mean(1, keepdims=True)                        # the structure across the columns, not the brightness
+    edges = np.abs(cv2.Sobel(raw, cv2.CV_32F, 0, 1, ksize=3)) + np.abs(cv2.Sobel(raw, cv2.CV_32F, 1, 0, ksize=3))
     c = m[y0:y1, x0:x1]
     best, row = MIRROR_NCC, None
     for r in range(H // 2, H - 3):
         k = min(max(4, H // 6), r, H - r)
         both = c[r - k:r][::-1] & c[r:r + k]
         if both.sum() < 30:
+            continue
+        # a reflection is blurred: its edges are clearly weaker than the car's above it (wheels and sills are sharp)
+        if edges[r:r + k][both].mean() > MIRROR_BLUR * edges[r - k:r][::-1][both].mean():
             continue
         a, b = g[r - k:r][::-1][both], g[r:r + k][both]
         a, b = a - a.mean(), b - b.mean()
@@ -528,6 +539,35 @@ def drop_reflections(objects):
     return keep
 
 
+def hidden_contact(o, objects, shape, margin=8):
+    """The hull points of o that touch an object in front of it: one whose 2D box ends lower in the image (by margin
+    px) is nearer to the elevated camera, and where o's silhouette borders it, o is hidden behind it (bool per point)."""
+    occ = np.zeros(shape, bool)
+    for p in objects:
+        if p is not o and p["box"][3] > o["box"][3] + margin:
+            occ |= cv2.dilate(p["mask"].astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+    q = np.clip(np.round(o["hull"] * SCALE - 0.5).astype(int), 0, [shape[1] - 1, shape[0] - 1])
+    return occ[q[:, 1], q[:, 0]]
+
+
+def relift_hidden(cam, objects, shape):
+    """In dense traffic a car's lower part is hidden behind a car in front, and the bottom of its silhouette is that
+    car's roof edge: the tangents there put the box too far along the viewing ray. They are left out and the object is
+    lifted again from the others (the top, the sides, the visible bottom; the type's average size fills the rest);
+    the track refinement later keeps them out too."""
+    for o in objects:
+        if "hull" not in o:
+            continue
+        occluded = o["occluded"] | hidden_contact(o, objects, shape)
+        if occluded.sum() == o["occluded"].sum():
+            continue
+        r = lift(cam, o["hull"], o["box"], o["yaw"], occluded=occluded)
+        if r is not None and r["error"] <= E_ACCEPT:
+            o.update(centre=r["centre"], lwh=r["lwh"], type=r["type"], error=r["error"], tangent_rms=r["tangent_rms"],
+                     occluded=occluded, hidden=True)
+    return objects
+
+
 def drop_contained(objects):
     """An object whose 2D box lies mostly inside a larger object's box is a piece of it (a roof, a window); an
     object whose bottom edge lies inside a nearer object's box (sharing most of its columns) has no visible ground
@@ -612,7 +652,7 @@ def split_two_bodies(cam, obj, F, lab, shape, gray):
     return out                   # two cars that cannot be told apart are not shown as one box
 
 
-def detect(cam, prev_bgr, bgr, bg):
+def detect(cam, prev_bgr, bgr, bg, fg=None):
     """Alg. 1 on one frame (full-resolution frames, half-resolution mean background bg): objects (mask, box, type,
     cuboid, error) and the intermediate images."""
     prev_img, img = half(prev_bgr), half(bgr)
@@ -620,7 +660,7 @@ def detect(cam, prev_bgr, bgr, bg):
     flow_lab, mean = quantise(F)
     moving = np.linalg.norm(mean, axis=1) >= F_MIN
     colour_lab = colour_labels(img)
-    fg = foreground(img, bg)
+    fg = foreground(img, bg) if fg is None else fg            # or from a background subtractor (foreground.py)
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
     masks = absorb_small(cam, joint_segments(fg, colour_lab, flow_lab, moving, MIN_AREA), F, lab)
     segs = segment_records(masks, F, lab)
@@ -660,6 +700,7 @@ def detect(cam, prev_bgr, bgr, bg):
         else:
             pool = pool[1:]
     objects = drop_contained(drop_reflections(merge_duplicates(cam, segs, objects, shape, gray)))
+    objects = relift_hidden(cam, objects, shape)
     return objects, {"flow": F, "flow_labels": flow_lab, "colours": mean, "colour_labels": colour_lab,
                      "foreground": fg, "segments": masks}
 

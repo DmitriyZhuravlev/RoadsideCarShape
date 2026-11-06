@@ -14,7 +14,7 @@ reconstruction of the article takes (Sect. 4.1).
 | Step | Paper | Here |
 | :--- | :--- | :--- |
 | 1 | dense optical flow (any method) | Farnebäck, half resolution |
-| 2 | segments: flow coded in HSV (hue = direction, value = magnitude, fixed saturation), `KMEANS` colour quantisation, regions of one colour | three segmentations of the frame: **background**, the mean of the whole video, a pixel is foreground where the frame differs from it by more than 25 grey levels; **colour**, k-means (k = 12) on the frame's Lab colours; **flow**, k-means (k = 16) on the HSV-coded flow, colours clustered as points (v cos h, v sin h) of the HSV cone. A **segment** is a connected region that is foreground and lies wholly inside one colour segment and one moving flow segment. A segment smaller than 2 % of the image area a car would have at its distance joins its largest neighbour moving alike |
+| 2 | segments: flow coded in HSV (hue = direction, value = magnitude, fixed saturation), `KMEANS` colour quantisation, regions of one colour | three segmentations of the frame: **background subtraction** (`foreground.py`, see below; GSOC by default); **colour**, k-means (k = 12) on the frame's Lab colours; **flow**, k-means (k = 16) on the HSV-coded flow, colours clustered as points (v cos h, v sin h) of the HSV cone. A **segment** is a connected region that is foreground and lies wholly inside one colour segment and one moving flow segment. A segment smaller than 2 % of the image area a car would have at its distance joins its largest neighbour moving alike |
 | 3 | `LIFT`: the 2D box of a segment mapped onto the road by IPM; a footprint of the type's average size and the object's orientation inscribed in the quadrangle; the height so that the top face touches it | **the 3D box around the silhouette, after Dubská et al. (see below)**: the size is measured, not assumed. Before it, the object's mirror image on the wet road is cut off at the contact line |
 | 4 | type `t = argmin ‖d_t − d̂‖`; merge neighbouring segments while the error is large; keep the best fit | the type whose average size the measured size deviates least from (relative RMS deviation = the error); neighbours moving within 35° are merged one at a time, each time the one whose merge fits best; of all merges the one with the smallest error is kept (of near-equal ones of the same type, the larger), accepted if the deviation is ≤ 30 % |
 | 5 | post-processing: footprints cannot intersect on the road, a segment must be sufficiently convex | both; an object cut by the image border is skipped; two overlapping objects moving alike are merged if their union fits as well; an object inside a larger one, or whose bottom (its ground contact) is hidden inside a nearer object, is dropped; so is a mirror image below a car. **Two cars in one object** are split (see below) |
@@ -67,6 +67,21 @@ direction of the object's width, so the width is undetermined: at 60 m it came o
 **Tried and dropped.** A shadow test (darker than the background with its hue) also removes dark cars and tyres on
 the grey road, and the box loses its bottom; larger flow windows or k = 32 do not separate cars moving alike.
 
+**Background subtraction (`foreground.py`, `FG=...`).** The best classical background subtractors on
+ChangeDetection.net 2014 are SuBSENSE and PAWCS (St-Charles et al.): per pixel a set of samples of colour and local
+binary similarity patterns, with thresholds adapted by feedback. They are in BGSLibrary, which does not build against
+OpenCV 5 here; OpenCV contrib has **GSOC**, built on the same ideas, and LSBP. The online models see the whole video
+twice (the first pass builds the model, the second gives the masks). Compared on frames 010720–010744:
+
+| foreground | recall / precision | centre error | 2D box IoU | length error | masks |
+| :--- | ---: | ---: | ---: | ---: | :--- |
+| mean of the video | 0.35 / 0.66 | 1.65 m | 0.58 | 0.69 m | a ghost where a car waited at the light |
+| median of the video | 0.32 / 0.66 | 1.58 m | 0.52 | 0.58 m | no ghost, far cars break up |
+| **GSOC** | 0.34 / 0.64 | 1.64 m | 0.59 | **0.45 m** | no ghost, filled bodies, least noise |
+| LSBP | 0.36 / 0.63 | 1.40 m | 0.57 | 0.45 m | noisier, extra blobs |
+
+GSOC is randomised (it samples its model); its numbers vary by a few points from run to run.
+
 ## Camera and road plane (`camera.py`)
 
 * The dataset's calibration: intrinsics with the plumb-bob distortion (k1 = −0.43, strong) and the virtual-LiDAR →
@@ -78,11 +93,12 @@ the grey road, and the box loses its bottom; larger flow windows or k = 32 do no
 
 ## Run
 
-    pip install opencv-python numpy scipy matplotlib
-    python run_example.py [DATA_DIR] [FIRST] [N]
+    pip install opencv-contrib-python numpy scipy matplotlib pillow
+    FG=gsoc python run_example.py [DATA_DIR] [FIRST] [N]
 
-The defaults are the V2X-Seq-SPD example (intersection A of the article), frames 20–44 (2.5 s), a few seconds per
-frame on one CPU core. Outputs in `out/`:
+The defaults are the V2X-Seq-SPD example (intersection A of the article), frames 20–44 (2.5 s); the outputs in
+`out/` are of `FG=gsoc python run_example.py <example> 20 60`, frames 010719–010778 (6 s). A few seconds per frame on
+one CPU core. Outputs in `out/`:
 
 * `masks/<fid>.png`: uint16 instance masks;
 * `cuboids/<fid>.json`: per object, its track, type (of the track) and type in this frame, centre in the road frame
@@ -90,37 +106,61 @@ frame on one CPU core. Outputs in `out/`:
   `from_track` (detected / split / predicted);
 * `steps.png`: the steps on one frame;
 * `frames.png`: masks and cuboids on four frames;
-* `metrics.json`: the comparison with the labels.
+* `metrics.json`: the comparison with the labels;
+* `video.mp4`, `video.gif`: the clip with masks, cuboids and track ids ("(track)": an object placed by its track).
 
-## Result on the example (frames 010720–010744)
+## Result on the example
 
 Evaluation only: labelled objects that move in the frame (≥ 1 m/s), within 80 m and not truncated, matched to ours
-per frame by footprint centre (Hungarian, ≤ 3 m). 230 labelled object-frames.
+per frame by footprint centre (Hungarian, ≤ 3 m).
 
-| | flow only, paper's LIFT | + background and colour | + average-size box fit | + tangent box (measured size) | **+ two-car tests, tracks** |
-| :--- | ---: | ---: | ---: | ---: | ---: |
-| our objects / matched | 73 / 28 | 76 / 41 | 146 / 73 | 101 / 71 | 121 / 80 |
-| recall / precision | 0.12 / 0.38 | 0.18 / 0.54 | 0.32 / 0.50 | 0.31 / 0.70 | **0.35 / 0.66** |
-| median centre error | 1.78 m | 1.58 m | 1.68 m | 1.57 m | 1.65 m |
-| median yaw error (mod 180°) | 3.5° | 3.9° | 4.3° | 6.3° | 6.9° |
-| median 2D box IoU | 0.55 | 0.33 | 0.53 | 0.59 | 0.58 |
-| median size error l / w / h | 0.33 / 0.22 / 0.11 m | 1.13 / 0.37 / 0.28 m | 0.51 / 0.18 / 0.22 m | 0.82 / 0.20 / 0.18 m | 0.69 / 0.18 / 0.18 m |
-| size | type average | type average | type average | measured | measured |
-| class agreement (car / large / two-wheeler / pedestrian) | 0.93 | 0.39 | 0.62 | 0.80 | 0.80 |
+**Development, frames 010720–010744 (230 labelled object-frames)**, the method step by step:
 
-Of the last column's 134 objects (before the 80 m limit of the evaluation), 97 are detected, 13 split from a merged
-object by the tracks and 24 predicted from the tracks. The two cars of different colour that merged in a dozen frames
-(a beige sedan and a white car partly behind it) are now apart in every frame, and from about the middle of the clip
-so are a white SUV and a white van driving side by side.
+| | flow only, paper's LIFT | + background and colour | + average-size box fit | + tangent box (measured size) | + two-car tests, tracks | **+ GSOC** |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| recall / precision | 0.12 / 0.38 | 0.18 / 0.54 | 0.32 / 0.50 | 0.31 / 0.70 | 0.35 / 0.66 | 0.34–0.38 / 0.64–0.69; with the depth fix 0.43 / 0.81 |
+| median centre error | 1.78 m | 1.58 m | 1.68 m | 1.57 m | 1.65 m | 1.47–1.64 m |
+| median 2D box IoU | 0.55 | 0.33 | 0.53 | 0.59 | 0.58 | 0.56–0.59 |
+| median size error l / w / h | 0.33 / 0.22 / 0.11 m | 1.13 / 0.37 / 0.28 m | 0.51 / 0.18 / 0.22 m | 0.82 / 0.20 / 0.18 m | 0.69 / 0.18 / 0.18 m | 0.45–0.53 / – / 0.13 m |
+| size | type average | type average | type average | measured | measured | measured |
 
-The flow-only figures are kept as `out/steps_flow_only.png` and `out/frames_flow_only.png`.
+**The 6-second clip, frames 010719–010778 (559 labelled object-frames), GSOC:**
+
+| | before the depth fix | **now** |
+| :--- | ---: | ---: |
+| our objects / matched | 358 / 171 | 343 / 240 |
+| recall / precision | 0.31 / 0.48 | **0.43 / 0.70** |
+| median centre error | 1.49 m | 1.60 m |
+| median yaw error (mod 180°) | 8.2° | 7.0° |
+| median 2D box IoU | 0.62 | **0.71** |
+| median size error l / w / h | 0.30 / 0.18 / 0.18 m | 0.46 / 0.21 / 0.17 m |
+| class agreement (car / large / two-wheeler / pedestrian) | 0.79 | 0.79 |
+| along-ray bias of the cars at 60–80 m | +2.0 m | +0.7 m |
+
+**The depth bias and its fix.** Before the fix, cars crossing the view at 60–80 m stood a median 2.1 m too far along
+the viewing ray, growing over the clip to +4.0 m, and three quarters of the "false" detections were such cars 3–6 m
+from their label. The crops showed boxes standing above the wheels: the contact-line cut, which removes a car's
+mirror image on the wet road, found a "mirror" at a far car's sill and cut its wheels off, so the bottom tangents
+touched the body and the box went back along the ray. A reflection is blurred, wheels and sills are sharp: the cut
+now also needs the edges below the line to be at most 0.7 of those above (`MIRROR_BLUR`). On the last 15 frames the
+bias of the detections fell from +3.5 to +1.1 m (with no cut at all: +0.7 m, but on the wet first frames the
+reflection then pulls the boxes 1.35 m too near).
+
+What is left, +1.5 to +2.3 m in the second half of the clip (−1.0 m in the first): about 0.35 m from the width along
+the ray, measured 0.7 m too large (the size a high camera sees worst for a crossing car), the rest from cars whose
+lower part is hidden behind a car in the near lane. Such tangents are now left out where the silhouette borders a
+detected object in front (`relift_hidden`), but the car in front is often not detected itself. Tried and dropped: a
+firmer width prior (weight 0.5): the late bias rose to +1.7 m and the boxes fitted worse.
 
 Remaining failure modes:
 
+* **Hidden ground contact in dense far traffic:** see above.
 * **Cars merged from the start of their tracks:** the white SUV and van are one object until their tracks, which
-  begin where they drive apart, reach back (5 frames); before that they are one "bus", and their track's type is
-  pulled to it.
-* **Dense far traffic:** at 60–80 m cars, cyclists and motorcyclists occlude each other; about two thirds of them are
-  still missed.
+  begin where they drive apart, reach back (5 frames); before that they are one "bus".
 * **Heading at the start of motion:** a car that is just starting keeps one frame's flow direction, which is noisy.
 * **Stopped objects** have no flow and are not detected, by design.
+* **Labels on the LiDAR's clock:** the labelled boxes trail the cars in the image by a fraction of a second along
+  their motion, which adds to the measured centre error of every moving car.
+
+The figures of the flow-only first version are in the commit that added this folder (`out/steps_flow_only.png`,
+`out/frames_flow_only.png`).
