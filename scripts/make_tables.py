@@ -22,7 +22,6 @@ STEPS = [("full", "full method (ours)"), ("noba", "$-$ one rigid body per track"
          ("nocabin", "$-$ cabin from the masks"), ("noroof", "$-$ roof from the far edge"),
          ("noprior", "$-$ cuboid completion of end-on cars")]
 # moving camera (V2X-Seq vehicle side, 58 windows): visual odometry and detection against the labels
-EGO = {"Egopath": "13\\,\\%", "Egolabels": 187, "Egofound": 25, "Egorecall": "0.13", "Egoprecision": "0.53"}
 
 
 def write_macros(path, values):
@@ -82,7 +81,7 @@ def main():
         "Ascanned": A["scanned"], "AlabScanned": A["lab_scanned"],
         "Acentre": f"{A['centre']:.1f}", "Bcentre": f"{B['centre']:.1f}",
         "Aalong": f"{A['along']:.2f}", "Aacross": f"{A['across']:.2f}", "Balong": f"{B['along']:.2f}",
-        "Bacross": f"{B['across']:.2f}", "Acommon": len(common["A"]), "Bcommon": len(common["B"]), **EGO})
+        "Bacross": f"{B['across']:.2f}", "Acommon": len(common["A"]), "Bcommon": len(common["B"])})
 
     def fmt(v, d=3):
         return "--" if v is None else f"{v:.{d}f}"

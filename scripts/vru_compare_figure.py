@@ -6,7 +6,6 @@ import os, re
 import cv2, numpy as np
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs/vru_precise")
 ROWS = [("seq_0077_000118/carve/vru_000118.jpg", "seq_0077_000118/carve.log"),
-        ("seq_0059_003926/carve/vru_003926.jpg", "seq_0059_003926/carve.log"),
         ("seq_0059_003897/tri/vru_003897.jpg", "seq_0059_003897/final.log"),
         ("seq_0059_003949/carve/vru_003949.jpg", "seq_0059_003949/carve.log")]   # motorcyclist from behind: the carve
                                                                                    # alone (0.73) beats carve + surface (0.71)

@@ -70,8 +70,7 @@ DECLARATIONS = r"""
 \backmatter
 
 \section*{Abbreviations}
-CAD: computer-aided design; GPS: global positioning system; ICP: iterative closest point; INS: inertial navigation
-system; IoU: intersection over union; IPM: inverse perspective mapping; LiDAR: light detection and ranging; RANSAC:
+CAD: computer-aided design; IoU: intersection over union; IPM: inverse perspective mapping; LiDAR: light detection and ranging; RANSAC:
 random sample consensus; SUV: sport utility vehicle; V2X: vehicle-to-everything.
 
 \section*{Declarations}

@@ -12,7 +12,7 @@ PICK = [("DAIR-V2X-C", "ann_P_clip_52_1_all", "000126", "all_clip_52_1"),
         ("DAIR-V2X-C", "ann_P_clip_52_1_all", "000163", "all_clip_52_1"),
         ("V2X-Seq-SPD", "ann_P_seq_0002_all", "001502", "all_seq_0002"),
         ("DAIR-V2X-C", "ann_P_clip_52_1_all", "000067", "all_clip_52_1"),
-        ("V2X-Seq-SPD", "ann_P_seq_0082_all", "000164", "all_seq_0082"),
+        ("V2X-Seq-SPD", "ann_P_seq_0002_all", "001532", "all_seq_0002"),
         ("DAIR-V2X-C", "ann_P_clip_105_0_all", "000096", "all_clip_105_0"),
         ("V2X-Seq-SPD", "ann_P_seq_0054_all", "002324", "all_seq_0054")]
 W, H = 400, 270

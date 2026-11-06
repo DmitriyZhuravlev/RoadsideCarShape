@@ -18,7 +18,8 @@ DUMPS = os.environ.get("DUMPS", "docs/whole_scene_objects_dense")
 
 def window_object(k, uv):
     """The dumped object of window k whose body pixels are uv."""
-    for o in pickle.load(open(os.path.join(DUMPS, f"{k:04d}.pkl"), "rb")):
+    path = os.path.join(DUMPS, f"{k:04d}.pkl")
+    for o in pickle.load(open(path, "rb")) if os.path.exists(path) else []:
         b = o["uv"][o["body"]]
         if len(b) == len(uv) and np.allclose(b, uv):
             return o
@@ -34,9 +35,12 @@ def main():
     for n in tracks:
         m = models[n]
         cands = cf.candidate_windows(m, [o for j, o in models.items() if j != n], seq.shape)
-        (fit, _), k, uv = max(((cf.image_fit(seq, m, k, uv), k, uv) for k, uv in cands),
-                              key=lambda t: t[0][0] * np.sqrt(t[0][1]))
-        o = window_object(k, uv)
+        # the best-fitting window that has a dump (not every window of the run is in DUMPS)
+        for (fit, _), k, uv in sorted(((cf.image_fit(seq, m, k, uv), k, uv) for k, uv in cands),
+                                      key=lambda t: -t[0][0] * np.sqrt(t[0][1])):
+            o = window_object(k, uv)
+            if o is not None:
+                break
         T = o["tri"][o["body"][o["tri"]].all(1)]
         A_ = 0.5 * np.linalg.norm(np.cross(o["X"][T[:, 1]] - o["X"][T[:, 0]], o["X"][T[:, 2]] - o["X"][T[:, 0]]), axis=1)
         T = T[A_ < 1.5]                                       # long slivers across the outline are no surface

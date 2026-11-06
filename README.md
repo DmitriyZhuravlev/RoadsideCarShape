@@ -55,10 +55,9 @@ The numbers come from 3dseg commit `85785c2`; the same code is in `code/`.
     `docs/whole_scene_cars_all_<clip>.json`; `pool.py` scores the labelled boxes (`boxes.json`).
 - Figures of intersection A: `scripts/capture_models.py` (with `DUMPS=docs/ba_objects/A`) keeps the models with their
   poses in `figures/models_A.pkl` (large, regenerable, not in git); then `cars_figure.py` (`cars_best.png`),
-  `scene_figure.py` (`scene_models.jpg`), `method_figure.py 003972 003890 004006` (`method_steps.png`, with the same
-  `DUMPS`), `lidar_reference_figure.py` (`lidar_reference.png`).
+  `scene_figure.py` (`scene_models.jpg`), `method_figure.py 003976 003985 003890` (`method_steps.png`, with
+  `DUMPS=docs/ann_objects_Aall1`), `lidar_reference_figure.py` (`lidar_reference.png`).
 - `figures/best_models.png` (the best models of all datasets with their video frames) and `figures/vru_compare.png`
   (pedestrians and cyclists with our own and with the labelled 2D boxes as tracking): `scripts/best_models_figure.py`
   and `scripts/vru_compare_figure.py`; `figures/turntable.gif`: `scripts/gif_variants.py`.
-- Copied from the 3dseg outputs: `window.jpg`, `triangulation_B.png` (an earlier version's models of B, kept as the
-  failure the prior fixes), `moving_camera.png`.
+- Copied from the 3dseg outputs: `window.jpg`.
