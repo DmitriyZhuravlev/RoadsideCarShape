@@ -33,10 +33,8 @@
 \begin{abstract}
 Roadside cameras watch the same intersection for years, yet monocular 3D perception for them is almost always a
 learned detector that outputs boxes and needs thousands of labelled 3D boxes from the same kind of camera. We present
-a learning-free 3D triangulation of the objects that move past a fixed, calibrated, elevated camera. Its input is a
-mask and a 3D cuboid of each moving object per frame, from classical detection and tracking: background subtraction
-and optical-flow clustering for the masks, vanishing-point calibration with 3D vehicle boxes for the cuboids. In
-short windows of the video the
+a learning-free 3D triangulation of the objects that move past a fixed, calibrated, elevated camera. In short
+windows of the video the
 masked surface is triangulated and its planar rigid motion and the depth of every vertex are solved jointly, with the
 scale fixed by the cuboid. The windows of one object are then solved together as one rigid body, with one pose per
 frame, mirrored about its symmetry plane --- a car, a cyclist and, roughly, a pedestrian are symmetric --- averaged as
@@ -47,8 +45,7 @@ accumulated LiDAR, completed by its mirror image --- on its tuning intersection 
 \BsixClosed{} on a second intersection (\BlabClosed{}); unchanged, they reach
 \DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD
 (labelled boxes: \DairBoxClosed{} and \SpdBoxClosed{}). Pedestrians and cyclists are reconstructed by the same
-masks, cuboids and symmetry. We also show that the usual LiDAR reference is strongly biased at long range: against
-the raw accumulated scan the labelled box itself scores only \AlabRaw{}.
+masks, cuboids and symmetry.
 \keywords{3D reconstruction \and vehicle shape \and roadside camera \and visual hull \and structure from motion \and
 monocular vision \and learning-free}
 \end{abstract}
