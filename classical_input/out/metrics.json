@@ -1,0 +1,20 @@
+{
+ "frames": 25,
+ "labelled moving objects (object-frames)": 230,
+ "our objects": 121,
+ "matched": 80,
+ "recall": 0.34782608695652173,
+ "precision": 0.6611570247933884,
+ "median centre error m": 1.653917128660448,
+ "median yaw error deg (mod 180)": 6.902533294416639,
+ "median 2D box IoU": 0.5790568890307941,
+ "median |dl| m": 0.6885317772536967,
+ "median |dw| m": 0.18198659428821984,
+ "median |dh| m": 0.17505318934788516,
+ "class agreement (car / large / two-wheeler / pedestrian)": 0.8,
+ "matched range m (min, median, max)": [
+  20.40833136397362,
+  62.703881731099486,
+  71.30849745095078
+ ]
+}
