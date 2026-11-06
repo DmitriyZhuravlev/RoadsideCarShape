@@ -85,15 +85,15 @@ scale fixed by the cuboid. The windows of one object are then solved together as
 frame, mirrored about its symmetry plane --- a car, a cyclist and, roughly, a pedestrian are symmetric --- averaged as
 a robust height field and completed by a visual hull of its masks. The elevated camera sees the roof and one side;
 the rest is completed from the symmetry and the cuboid. No step is learned; LiDAR and 3D labels are used for
-evaluation only. The car models reach a solid (height-field) IoU of \AsixClosed{}
-against the cars' accumulated LiDAR, completed by its mirror image, on the intersection on which the method was tuned
-(labelled boxes: \AlabClosed{}) and \BsixClosed{} on a second intersection (\BlabClosed{}); unchanged, they reach
+evaluation only. The car models reach a mean solid IoU of \AsixClosed{} --- height fields against the cars'
+accumulated LiDAR, completed by its mirror image --- on its tuning intersection (labelled boxes: \AlabClosed{}) and
+\BsixClosed{} on a second intersection (\BlabClosed{}); unchanged, they reach
 \DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD
 (labelled boxes: \DairBoxClosed{} and \SpdBoxClosed{}). Pedestrians and cyclists are reconstructed by the same
 masks, cuboids and symmetry. We also show that the usual LiDAR reference is strongly biased at long range: against
 the raw accumulated scan the labelled box itself scores only \AlabRaw{}.}
 
-\keywords{3D reconstruction, vehicle shape, roadside camera, visual hull, structure from motion, learning-free}
+\keywords{3D reconstruction, vehicle shape, roadside camera, visual hull, structure from motion, monocular vision, learning-free}
 
 \maketitle
 
@@ -276,7 +276,7 @@ ray, $\vect{X}_i = \vect{C} + s_i \vect{d}_i$. They minimise
       + \lambda \sum_{(a,b)} w_{ab} \|\vect{n}_a - \vect{n}_b\|^2
       + W_a \sum_{i \in \mathcal{L}} X_{i,z}^2 \nonumber\\
       &+ W_m \sum_j \|\vect{m}_{j-1} - 2\vect{m}_j + \vect{m}_{j+1}\|^2_{\Sigma}
-      + W_h \sum_j \big( \vect{u}^\perp \cdot \vect{R}(-\bar\theta_j)(\vect{t}_{j+1} - \vect{t}_j) \big)^2 .
+      + W_h \sum_j \big( \vect{e}_\perp \cdot \vect{R}(-\bar\theta_j)(\vect{t}_{j+1} - \vect{t}_j) \big)^2 .
   \label{eq:energy}
 \end{align}
 with every squared residual $r^2$ entering through the robust soft-$\ell_1$ loss $\rho(r^2) = 2(\sqrt{1 + r^2} - 1)$,
@@ -286,8 +286,8 @@ across a colour edge, so that panels stay smooth and creases follow paint and tr
 the road: $\mathcal{L}$ holds the vertices on the mask's bottom row, where the tyres touch the road; vertices below
 that row belong to the mirror image on a wet road and are kept below the road. The fourth is temporal smoothness of
 the motion, in a norm $\|\cdot\|_{\Sigma}$ that weighs yaw against translation; the fifth forbids a sideways step: a
-car moves along its heading ($\vect{u}^\perp$ is the normal of the initial direction of travel, $\bar\theta_j$ the
-mean yaw of the step). Both motion priors are divided by the length of the path, so that they do not favour a smaller
+car moves along its heading ($\vect{e}_\perp$ is the lateral normal of the initial direction of travel, $\bar\theta_j$
+the mean yaw of the step). Both motion priors are divided by the length of the path, so that they do not favour a smaller
 copy of the car closer to the camera, which would move less. Every other vertex is bounded to the height of a car.
 
 The motion is initialised by a RANSAC Procrustes fit \cite{fischler_bolles_ransac} of the IPM points of the lowest
@@ -318,15 +318,16 @@ frame $g$. The energy is that of Eq.~(\ref{eq:energy}) summed over the windows, 
 poses of the whole track:
 \begin{align}
   E_{\text{track}} = &\sum_{w} \Big[ \sum_{i \in w} \sum_{g} \rho\Big(\big\| \pi_g\big(\vect{X}_i^{(g)}\big) - \vect{u}_{ig}
-      \big\|^2\Big) + \lambda \sum_{(a,b) \in w} w_{ab} \|\vect{n}_a - \vect{n}_b\|^2
+      \big\|^2\Big) \nonumber\\
+    &\quad + \lambda \sum_{(a,b) \in w} w_{ab} \|\vect{n}_a - \vect{n}_b\|^2
       + W_a \sum_{i \in \mathcal{L}_w} X_{i,z}^2 \Big] \nonumber\\
-    &+ W_m \sum_g \big\|\vect{Q}_{g-1} - 2\vect{Q}_g + \vect{Q}_{g+1}\big\|^2_{\Sigma}
-      + W_h \sum_g \big( \vect{n}(\bar\phi_g) \cdot (\vect{p}_{g+1} - \vect{p}_g) \big)^2 ,
+    &+ W_m \sum_g \big\|\vect{Q}_{g-1} - 2\vect{Q}_g + \vect{Q}_{g+1}\big\|^2_{\Sigma} \nonumber\\
+    &+ W_h \sum_g \big( \vect{e}_\perp(\bar\phi_g) \cdot (\vect{p}_{g+1} - \vect{p}_g) \big)^2 ,
   \label{eq:track}
 \end{align}
 over the poses $\vect{Q}_g$ and the depths $s_i$ of all vertices ($\vect{X}_i = \vect{C} + s_i \vect{d}_i$ along the
-reference ray of its window), where $\vect{n}(\phi) = (-\sin\phi, \cos\phi)$ is the car's lateral direction and
-$\bar\phi_g$ the mean heading of the step, and with the weights and bounds of the windows. One pose is held fixed,
+reference ray of its window), where $\vect{e}_\perp(\phi) = (-\sin\phi, \cos\phi)$ is the lateral normal of the
+heading $\phi$ and $\bar\phi_g$ the mean heading of the step, and with the weights and bounds of the windows. One pose is held fixed,
 which removes the gauge freedom (a common planar motion of all poses and points). The solve starts from a chain: the middle window's pose comes from the
 smoothed path of the track, and each window places the reference frame of its neighbour through its own solved
 motion, so that the start agrees with every window's points. The vertices on the outline of a window's triangulation
@@ -356,7 +357,7 @@ and a column must be seen by several windows. Columns with few points compared w
 cross-section are dropped: the true surface collects points from every window, the along-ray depth noise spreads them
 thin. A median filter and the largest connected component finish the field.
 
-\paragraph{Cabin from the masks.} The triangulated field covers the textured surface; windows and roof are often too
+\paragraph{Cabin from the masks.} The triangulated field covers the textured surface; the glass and the roof are often too
 dark or too uniform to track. The silhouette of the object in every frame is its mask; the masks of the frames in
 which the object is unoccluded and inside the image carve. Voxels are kept if they, and their mirror images, project
 inside the mask in most of the frames that see them (a visual hull \cite{laurentini}); the top of the kept voxels is
@@ -375,12 +376,13 @@ overshoots by about $\tfrac{L}{2}\tan\epsilon$ --- and the cap is applied only t
 side-on, the top edge of the mask is the crown of the rounded roof rather than its far edge, and the cap would lower
 the car.
 
-\paragraph{Body type, width and length.} The side profile of the car's silhouette in its most side-on windows gives
+\paragraph{Body type and width.} The side profile of the car's silhouette in its most side-on windows gives
 scale-free features (length to height, share of the length under the roof, height of the front and rear) and a type
 by fixed rules: sedan, hatchback, SUV or van. For a car seen from the side the width lies nearly along the viewing
 ray, where a single camera measures it worst; the width is therefore bounded about the symmetry plane by the type's
-typical width with its mirrors, which the LiDAR sees and a cuboid fitted to the body leaves out. The length is
-measured only where the car is seen side-on, i.e.\ where the viewing ray crosses the car at a large angle. A car seen
+typical width with its mirrors, which the LiDAR sees and a cuboid fitted to the body leaves out.
+
+\paragraph{Length.} The length is measured only where the car is seen side-on, i.e.\ where the viewing ray crosses the car at a large angle. A car seen
 side-on in fewer than two windows --- most often a car seen only from behind --- has a length and a profile the video
 never measured, only a silhouette cone that is long along the ray. It is completed from its cuboid: the footprint of
 the cuboid's length and width about the middle of the cone and the symmetry plane, and the profile of its body type
@@ -388,12 +390,14 @@ scaled to the cuboid's height, a box up to the shoulder line and a cabin box on 
 window. This is completion, not measurement, and we report the two groups of cars separately
 (Sect.~\ref{sec:results}). Cars measured side-on, vans included, keep their own length and shape.
 
-\paragraph{Mesh and colour.} The height field is regularised between its raw surface and a convex hull: every
+\paragraph{Surface.} The height field is regularised between its raw surface and a convex hull: every
 cross-section of the car becomes its upper concave envelope, which fills notches and holes in the roof, while along
 the car narrow spikes and thin sheets are removed and narrow dips are filled (grey-scale opening and closing), so that
 the steps from bonnet to windshield to roof survive. The surface of the regularised field (marching cubes
 \cite{marchingcubes}) is finally replaced by its Poisson surface \cite{kazhdan2006}, which removes the staircase of
-the columns; this changes the shown model, not the height field that is evaluated. For the figures the Poisson
+the columns; this changes the shown model, not the height field that is evaluated.
+
+\paragraph{Colour.} For the figures the Poisson
 surface is subdivided to about the size of a camera pixel on the car and coloured there. Every vertex takes the
 original pixels of the views that see it best --- facing it and near --- where it lies inside the car's silhouette and
 is not hidden by another part of the model; of these the medoid colour is kept, so that one view whose pose is a
@@ -401,7 +405,7 @@ little off is outvoted. Before sampling a view, the model's projected outline is
 silhouette: the windows at the ends of a track are often off by tens of pixels, and without this the glass lands on
 the bonnet. A vertex and its mirror image take the better seen of the two. A vertex no window sees takes the colour of
 a nearby seen vertex; farther from one, below the belt line one body colour, and above it the median colour of the
-seen vertices at the same height --- glass at window height, paint on the roof.
+seen vertices at the same height --- glass at cabin height, paint on the roof.
 
 \subsection{The system of equations}\label{sec:system}
 
@@ -430,12 +434,14 @@ search. The weights and thresholds were set once on intersection A and are the s
 % ------------------------------------------------------------------------------------------------------------------
 \section{Evaluation Protocol}\label{sec:protocol}
 
-\paragraph{Data.} \emph{Intersection A} is the infrastructure side of the V2X-Seq-SPD example \cite{v2xseq}
+\paragraph{Datasets.} \emph{Intersection A} is the infrastructure side of the V2X-Seq-SPD example \cite{v2xseq}
 (sequence 0058, 251 frames at 10~Hz, $1920 \times 1080$, camera 8.45~m above the road and tilted $15^\circ$ down,
 wet road). \emph{Intersection B} is the infrastructure side of the DAIR-V2X-C example \cite{dairv2x} (84 frames at
-12.5~Hz, camera 8.96~m high, dry road); its labels have no track identities, so we link the labelled boxes from frame
+12.5~Hz, camera 8.96~m above the road, dry road); its labels have no track identities, so we link the labelled boxes from frame
 to frame (for evaluation only). Every car of the intersections and of the larger evaluation is reconstructed from
-the masks and cuboids of Sect.~\ref{sec:input}. The parameters were chosen on intersection A, but B and five
+the masks and cuboids of Sect.~\ref{sec:input}.
+
+\paragraph{Tuning.} The parameters were chosen on intersection A, but B and five
 clips of the larger
 evaluation (Sect.~\ref{sec:results}) informed three design choices: the length cap only for cars never seen side-on,
 rather than for every car, was chosen on A, B and those five clips; the softer hull vote for those cars was chosen on A and B;
@@ -454,7 +460,7 @@ lines on the roof and the bonnet, and these gaps are counted as empty space. Sco
 \emph{labelled box itself} reaches a mean solid IoU of only \AlabRaw{} on intersection A --- about what our models
 score --- so the raw reference cannot rank methods near the top. We close the gaps by a grey-scale closing of the
 height field with a radius of 15~cm, which fills gaps between returns but does not extend the outline; against the
-closed field the labelled box scores \AlabClosed{} on A and \BlabClosed{} on B. We report both references.
+gap-closed field the labelled box scores \AlabClosed{} on A and \BlabClosed{} on B. We report both references.
 Figure~\ref{fig:lidar} shows the effect for two cars.
 
 \begin{figure}[t]
@@ -462,7 +468,7 @@ Figure~\ref{fig:lidar} shows the effect for two cars.
 \includegraphics[width=0.85\textwidth]{lidar_reference.png}
 \caption{The LiDAR reference of two cars of intersection A in the car frame (colour: height, 0--2~m). The raw
 accumulated field has gaps between the scan lines (left); closed with a radius of 15~cm it keeps the outline
-(middle). The labelled box (right) scores far lower against the raw field than against the closed one.}
+(middle). The labelled box (right) scores far lower against the raw field than against the gap-closed one.}
 \label{fig:lidar}
 \end{figure}
 
@@ -480,7 +486,7 @@ differences between our models and the labelled boxes on the same cars are given
 
 \begin{table}[t]
 \centering
-\caption{Cars against their accumulated LiDAR (mean over the evaluated cars). IoU against the raw and the gap-closed reference, footprint IoU and height error against the closed one, size errors against the labelled box. The labelled box and a box of our own estimated size are scored in the same way. A car the tracker split into two tracks counts twice (Table~\ref{tab:paired} keeps its longer track).}
+\caption{Cars against their accumulated LiDAR (mean over the evaluated cars). IoU against the raw and the gap-closed reference, footprint IoU and height error against the gap-closed one, size errors against the labelled box. The labelled box and a box of our own estimated size are scored in the same way. A car the tracker split into two tracks counts twice (Table~\ref{tab:paired} keeps its longer track).}
 \label{tab:main}
 \setlength{\tabcolsep}{4pt}
 \footnotesize
@@ -505,18 +511,26 @@ differences between our models and the labelled boxes on the same cars are given
 
 \paragraph{Intersection A (tuning set).} Table~\ref{tab:main} compares the models with three references scored in
 the same way: the labelled box, a box of our own estimated length, width and height, and the best single window
-without averaging and symmetry. Every one of the \Acars{} moving cars of A with a LiDAR reference is scored; a car is
-paired with its label over its whole track. A is the intersection on which the method was tuned,
+without averaging and symmetry. All \Acars{} moving cars of A with a LiDAR reference are scored; a car is paired
+with its label over its whole track. A is the intersection on which the method was tuned,
 so its comparison with the labelled box is in-sample; B and the larger evaluation below informed only the few choices
-listed in Sect.~\ref{sec:protocol}. Against the closed reference our models reach
+listed in Sect.~\ref{sec:protocol}. Against the gap-closed reference our models reach
 \AsixClosed{}, above the labelled boxes (\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the
 shape adds to the dimensions. A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
 (Fig.~\ref{fig:steps}). Figure~\ref{fig:scene} draws the models back into one frame of the video and
 Fig.~\ref{fig:cars} shows the best cars up close with their LiDAR.
 
+\paragraph{Intersection B.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
+labelled boxes (Table~\ref{tab:main}). B is harder than A: all \Bcars{} cars drive away from the camera and are seen
+only from behind. The textured part is then the rear, whose depth is measured along the viewing ray, and the
+silhouette cone is long in the same direction. No window of them is side-on, so their length comes from the cuboid,
+and the roof from the far edge of the masks; with both our models are ahead of the labelled boxes on every car of B
+(Table~\ref{tab:paired}: $+0.107$ $[+0.086, +0.129]$), with a height error of 11~cm. Their position along the ray is
+off by \Balong{}~m, which is the clock offset between camera and LiDAR, not the method (see \emph{Position} below).
+
 \begin{table}[t]
 \centering
-\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed). \emph{measured}: the car's length was seen side-on ($\ge 2$ side-on windows); \emph{completed}: never seen side-on, length and profile completed from its cuboid; \emph{held-out}: without the five clips that informed a choice during development. Intersection A is the tuning set of the method; B informed three choices (Sect.~\ref{sec:protocol}).}
+\caption{Paired difference of the mean solid IoU (ours $-$ labelled box) against the gap-closed LiDAR, per car, with a 95\,\% bootstrap confidence interval (5000 resamples, fixed seed); \emph{measured} and \emph{completed} cars as defined in the text. Intersection A is the tuning set of the method; B informed three choices (Sect.~\ref{sec:protocol}).}
 \label{tab:paired}
 \small
 \begin{tabular}{llrcl}
@@ -544,7 +558,9 @@ V2X-Seq-SPD & all & 102 & +0.026 & [+0.005, +0.046] \\
 \end{table}
 
 \paragraph{Paired comparison.} Table~\ref{tab:paired} pairs every car with its labelled box and bootstraps the
-mean difference. Our models are ahead of the box with the interval clear of zero on all four sets: on both
+mean difference; a car is \emph{measured} when at least two of its windows saw its length side-on, \emph{completed}
+when none did (Sect.~\ref{sec:completion}), and the \emph{held-out} rows leave out the five clips that informed a
+choice during development. Our models are ahead of the box with the interval clear of zero on all four sets: on both
 intersections ($+0.100$ on A, $+0.107$ on B), on the \DairCars{} cars of DAIR-V2X-C ($+0.064$ $[+0.043, +0.083]$)
 and on the \SpdCars{} cars of V2X-Seq-SPD ($+0.026$ $[+0.005, +0.046]$), also on the clips that informed no choice
 ($+0.057$ $[+0.026, +0.084]$, 61 cars, and $+0.026$ $[+0.004, +0.045]$, 92 cars). The margin is smallest on
@@ -621,14 +637,6 @@ by 0.10~m against their LiDAR (Sect.~\ref{sec:completion}). Filling the unseen p
 instead of the masks' carve, placing every window by its cuboid instead of the rigid solve, and bounding the width by
 the cuboid's all scored lower on A, and we dropped them.
 
-\paragraph{Intersection B.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
-labelled boxes (Table~\ref{tab:main}). B is harder than A: all \Bcars{} cars drive away from the camera and are seen
-only from behind. The textured part is then the rear, whose depth is measured along the viewing ray, and the
-silhouette cone is long in the same direction. No window of them is side-on, so their length comes from the cuboid,
-and the roof from the far edge of the masks; with both our models are ahead of the labelled boxes on every car of B
-(Table~\ref{tab:paired}: $+0.107$ $[+0.086, +0.129]$), with a height error of 11~cm. Their position along the ray is
-off by \Balong{}~m, which is the clock offset between camera and LiDAR, not the method (see \emph{Position} above).
-
 \begin{table}[!htb]
 \centering
 \caption{Larger evaluation, no parameter changed: clips of DAIR-V2X-C and sequences of V2X-Seq-SPD, two or three per intersection. Mean solid IoU of our models and of the labelled boxes against the cars' raw and gap-closed accumulated LiDAR; median position error of our models along and across the viewing ray.}
@@ -666,7 +674,7 @@ we ran it unchanged on \DairClips{} clips of DAIR-V2X-C (\DairFrames{} frames at
 longest per intersection, without intersection A; frames missing from the recording are skipped and the motion is
 measured per time slot. Table~\ref{tab:large} scores every car with a LiDAR reference and a labelled box against both
 references. On DAIR-V2X-C the \DairCars{} cars reach \DairOursClosed{} against \DairBoxClosed{} for the labelled boxes
-on the closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one; on V2X-Seq-SPD the \SpdCars{} cars
+on the gap-closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one; on V2X-Seq-SPD the \SpdCars{} cars
 reach \SpdOursClosed{} against \SpdBoxClosed{} (\SpdOursRaw{} against \SpdBoxRaw{} raw). On DAIR-V2X-C our models are
 ahead at every intersection, and on V2X-Seq-SPD too, by the smallest margin at its busiest one, where many cars
 creep through the intersection and come out too long (Sect.~\ref{sec:limits}). Of the 224 cars of these clips with a
@@ -679,12 +687,12 @@ the video.
 \includegraphics[width=\textwidth]{best_models.png}
 \caption{Eight car models of all datasets, solved on the masks and cuboids of Sect.~\ref{sec:input}. Per car: the video frame with
 the car framed; the model with the original pixels of its best views from the front left and from the rear left; its
-solid IoU against the closed LiDAR and its length against the labelled length.}
+solid IoU against the gap-closed LiDAR and its length against the labelled length.}
 \label{fig:large}
 \end{figure}
 
 Figure~\ref{fig:allsides} shows one more car of DAIR-V2X-C from all sides. It turns in front of the camera, so its
-left side and its rear are seen; the right side is the mirror image of the left. Its solid IoU against the closed
+left side and its rear are seen; the right side is the mirror image of the left. Its solid IoU against the gap-closed
 LiDAR is 0.88; it is 4.8~m long against the labelled 4.4~m. What no window saw keeps the fill of
 Sect.~\ref{sec:completion}: the back in the body colour and, on the bonnet, the median colour of its height, which
 at the bonnet's height is partly glass.
@@ -692,7 +700,7 @@ at the bonnet's height is partly glass.
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=\textwidth]{all_sides.png}
-\caption{One car model of DAIR-V2X-C from all sides (clip 114\_0, car 000046, solid IoU 0.88 against the closed
+\caption{One car model of DAIR-V2X-C from all sides (clip 114\_0, car 000046, solid IoU 0.88 against the gap-closed
 LiDAR): the video frame with the car framed, and the model from eight directions every 45$^\circ$ and from above.
 The camera saw its left side and its rear; the right side is mirrored; the colours are the original pixels of its
 best views.}
