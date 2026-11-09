@@ -586,7 +586,8 @@ only from behind. The textured part is then the rear, whose depth is measured al
 silhouette cone is long in the same direction. No window of them is side-on, so their length comes from the cuboid,
 and their roof from the far edge of the masks. With both, our models are ahead of the labelled boxes on every car of B
 (Table~\ref{tab:paired}: $+0.107$ $[+0.086, +0.129]$), with a height error of 11~cm. Their position along the ray is
-off by \Balong{}~m, which is the clock offset between camera and LiDAR, not the method (see \emph{Position} below).
+off by \Balong{}~m, which is the clock offset between camera and LiDAR, not the method: with that offset fitted, it
+is 0.48~m (see \emph{Position} below).
 
 \begin{table}[t]
 \centering
@@ -636,7 +637,9 @@ the car's centre is off by a median of \Aalong{}~m along the viewing ray and \Aa
 evaluation by \DairAlong{}~m and \SpdAlong{}~m along the ray (Table~\ref{tab:large}). On B it is off by \Balong{}~m
 along the ray, but there the camera and the LiDAR of the dataset are not synchronised: the model stands at the
 camera's time, the label at the LiDAR's, and a car at traffic speed travels several metres between the two clocks,
-along the direction of travel, which on B is the viewing ray. The same clock offset, on single clips of the larger
+along the direction of travel, which on B is the viewing ray. One time offset fitted to the paths of all cars of B
+($-2.25$ frames, 0.18~s; evaluation only) brings the median distance from model to label from 3.14 to 0.54~m and the
+error along the ray from \Balong{} to 0.48~m. The same clock offset, on single clips of the larger
 evaluation, put some fast cars more than 3~m from their label; a car is therefore paired with its label over its
 whole track, not by its position in a single frame. The heading from the
 motion is accurate: against the labelled yaw (modulo $180^\circ$, per car the median over its windows) the median
