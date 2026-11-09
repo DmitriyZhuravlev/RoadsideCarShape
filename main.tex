@@ -130,9 +130,9 @@ with yaw change $\theta_j$, translation $\vect{t}_j \in \R^2$ and the car's cent
 % ------------------------------------------------------------------------------------------------------------------
 \section{Method}
 
-The method has five steps (Fig.~\ref{fig:pipeline}). The masks and cuboids of the moving objects are given (Sect.~\ref{sec:input},
-Fig.~\ref{fig:overview} top; a classical way to obtain them in Sect.~\ref{sec:classical}); the visible surface of every object is triangulated in
-3D in short windows of the video (Sect.~\ref{sec:window}, Fig.~\ref{fig:overview} bottom); its orientation comes from
+The method has five steps (Fig.~\ref{fig:pipeline}). The masks and cuboids of the moving objects are given (Sect.~\ref{sec:input}; a classical way to obtain them in Sect.~\ref{sec:classical},
+Fig.~\ref{fig:classical_steps}); the visible surface of every object is triangulated in
+3D in short windows of the video (Sect.~\ref{sec:window}, Fig.~\ref{fig:steps} left); its orientation comes from
 its motion (Sect.~\ref{sec:heading}, Fig.~\ref{fig:heading}); the windows of one object are solved together as one
 rigid body (Sect.~\ref{sec:fusion}); and what the camera never sees is completed from symmetry, the masks and the
 cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:system} collects the equations solved.
@@ -161,14 +161,6 @@ cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:syst
 \caption{The pipeline. Every window of $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
 are then fused over the whole video (orange). No step of the reconstruction is learned.}
 \label{fig:pipeline}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{window.jpg}
-\caption{One frame of intersection~A. Top: the moving cars' masks (white outline) and their cuboids. Bottom: the body triangulation of every window whose reference frame this is, one colour per car, each
-solved in 3D.}
-\label{fig:overview}
 \end{figure}
 
 \subsection{Masks and cuboids}\label{sec:input}
@@ -203,7 +195,8 @@ lifting replaced by the tangent construction of \cite{dubska2014} and a track st
 the background subtraction, with the car's shadow on the wet road; (c) the colour segmentation; (d) the optical flow,
 its direction as hue and its speed as value; (e) the segments, foreground lying inside one colour and one motion (the
 shadow forms segments of its own); (f) the object's mask, merged from the car's segments without the shadow, and the
-cuboid built around it.}
+cuboid built around it; (g) the body triangulation of its window (Sect.~\ref{sec:window}): vertices on a grid inside the
+eroded mask, tracked through $\pm 8$ frames, triangulated by Delaunay; (h) the same mesh tracked to frame $+4$.}
 \label{fig:classical_steps}
 \end{figure}
 
@@ -303,7 +296,8 @@ cuboid fixes where the object is and how large; its shape still comes from the t
 \centering
 \includegraphics[width=\textwidth]{heading.png}
 \caption{Orientation from motion, intersection A. (a) The path of every car and its heading from the track solve
-(blue arrows), with the cuboids of the input, fitted to the cars' LiDAR (grey); (b) a turning car up close. The
+(blue arrows), with the cuboids of the input, fitted to the cars' LiDAR (grey; ``evaluation'' in the legend: shown here for
+comparison); (b) a turning car up close. The
 heading follows the direction of travel through the turn; median error against the labelled yaw $4.6^\circ$ over
 the 24 cars of A.}
 \label{fig:heading}
@@ -518,8 +512,7 @@ so its comparison with the labelled box is in-sample; B and the larger evaluatio
 listed in Sect.~\ref{sec:protocol}. Against the gap-closed reference our models reach
 \AsixClosed{}, above the labelled boxes (\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the
 shape adds to the dimensions. A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
-(Fig.~\ref{fig:steps}). Figure~\ref{fig:scene} draws the models back into one frame of the video and
-Fig.~\ref{fig:cars} shows four of them up close with their LiDAR.
+(Fig.~\ref{fig:steps}). Figure~\ref{fig:cars} shows four of the models up close, drawn into their frames, with their LiDAR.
 
 \paragraph{Intersection B.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
 labelled boxes (Table~\ref{tab:main}). B is harder than A: all \Bcars{} cars drive away from the camera and are seen
@@ -556,15 +549,6 @@ whole track, not by its position in a single frame. The heading from the
 motion is accurate: against the labelled yaw (modulo $180^\circ$, per car the median over its windows) the median
 error is $4.6^\circ$ on A and $1.6^\circ$ on B, $3.3^\circ$ and $2.4^\circ$ on the cars of DAIR-V2X-C and
 V2X-Seq-SPD.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{scene_models.jpg}
-\caption{Intersection A, frame 30, about 60--70~m from the camera. Top: the video. Bottom: the four car models,
-fused over the whole video, drawn at their pose in this frame (all models whose projection matches the car's
-silhouette in this frame).}
-\label{fig:scene}
-\end{figure}
 
 \begin{figure}[t]
 \centering
