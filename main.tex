@@ -61,7 +61,8 @@ trained for one camera height and one city degrades when either changes \cite{be
 A fixed camera offers something a single image does not: every car is seen in many frames, from a slowly changing
 direction, against a background that does not move. This is the classical setting of structure from motion for
 rigidly moving objects \cite{ozden2010} and of shape from silhouettes \cite{laurentini,spacecarving}. This paper
-asks how far these classical tools go today for full car shapes at up to 70~m from the camera, and measures the
+asks how far these classical tools go today for full car shapes at the distances of a roadside camera (up to 70~m
+in the datasets used here; the reachable range depends on the camera's resolution and focal length), and measures the
 answer against LiDAR.
 
 The method takes, for every moving object, its mask and its 3D cuboid in each frame, from any source: masks can come from background subtraction or the clustering of optical flow
