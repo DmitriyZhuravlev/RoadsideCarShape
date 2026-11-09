@@ -235,11 +235,13 @@ lifting replaced by the tangent construction of \cite{dubska2014} and a track st
 \centering
 \includegraphics[width=0.88\textwidth]{classical_steps.png}
 \caption{The classical input around one car of intersection A (frame 010871): (a) the frame; (b) the foreground of
-the background subtraction, with the car's shadow on the wet road; (c) the colour segmentation; (d) the optical flow,
-its direction as hue and its speed as value; (e) the segments, foreground lying inside one colour and one motion (the
-shadow forms segments of its own); (f) the object's mask, merged from the car's segments without the shadow, and the
-cuboid built around it; (g) the body triangulation of its window (Sect.~\ref{sec:window}): vertices on a grid inside the
-eroded mask, tracked through $\pm 8$ frames, triangulated by Delaunay; (h) the same mesh tracked to frame $+4$.}
+the background subtraction, with the car's shadow on the wet road; (c) the optical flow, its direction as hue and its
+speed as value; (d) the segments, foreground lying inside one colour and one motion (the shadow forms segments of its
+own); (e) the object's mask, merged from the car's segments without the shadow, its silhouette (white) and the cuboid
+built around it: the tangents from the vanishing points of the direction of motion (red), the lateral (green) and the
+vertical direction (blue) touch the box along its edges (dots), and the box's size is measured; (f) the body
+triangulation of its window (Sect.~\ref{sec:window}): vertices on a grid inside the eroded mask, tracked through
+$\pm 8$ frames, triangulated by Delaunay; (g) the same mesh tracked to frame $+4$.}
 \label{fig:classical_steps}
 \end{figure}
 
@@ -254,7 +256,7 @@ at its distance joins its largest neighbour that moves alike.
 \paragraph{Objects and cuboids.} Starting from the largest, neighbouring segments that move alike are merged into an
 object one at a time, each time the one whose merge fits an object type best, and the best of these merges is kept
 \cite{moving_orig}; a large segment of another colour that widens the object is another car's body and is not merged.
-The cuboid of an object is built around its silhouette (Fig.~\ref{fig:classical_tangents}). Its axes are the direction
+The cuboid of an object is built around its silhouette (Fig.~\ref{fig:classical_steps}e). Its axes are the direction
 of motion, from the optical flow on the road, the lateral and the vertical direction, and each has a vanishing point;
 the two tangents from a vanishing point to the silhouette are the images of two planes through the camera centre that
 touch the box along an edge \cite{dubska2014}. With the calibrated camera each tangency is a linear equation in the
@@ -265,15 +267,6 @@ lifting of \cite{moving_orig}, which fixes the type's length and inscribes the f
 quadrangle of the 2D box, leaves the width undetermined for a car that crosses the view far away.) On the wet road a
 car's mirror image is cut off at the contact line, below which the image is the car mirrored and blurred, and the
 tangents along a nearer object are left out.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.55\textwidth]{classical_tangents.png}
-\caption{The cuboid built around a car's silhouette (white): the tangents from the vanishing points of the direction
-of motion (red), the lateral (green) and the vertical direction (blue) touch the box along its edges (dots); the
-measured size is given above the image.}
-\label{fig:classical_tangents}
-\end{figure}
 
 \paragraph{Tracks.} The objects are linked in the image, each track's 2D box moved by its optical flow. Per track, the
 heading is the flow's direction of motion averaged over the neighbouring frames, and the size is the median of the
