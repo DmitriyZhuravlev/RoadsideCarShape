@@ -15,22 +15,20 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "tables", "classical_input.tex")
 N_BOOT, SEED = 5000, 0
-CAPTION = (r"A classical input (Sect.~\ref{sec:classical}) on all frames of intersections A and B: background "
-           r"subtraction (GSOC), colour and optical-flow segments merged into objects \cite{moving_orig}, each "
-           r"object's cuboid built from "
-           r"the tangents of its silhouette to the three vanishing points \cite{dubska2014}, tracks; no learned "
-           r"component, the labels and the LiDAR read for this evaluation only. Top: against the labelled boxes of the "
+CAPTION = (r"The classical input (Sect.~\ref{sec:classical}) on all frames of intersections A and B. Top: against the labelled boxes of the "
            r"moving road users (at least 1~m/s, within 80~m, not truncated), matched per frame within 3~m (on B within "
            r"6~m: its labels lag the image by the camera--LiDAR clock offset, Sect.~\ref{sec:limits}); medians. "
            r"Bottom: the classical cuboid of each matched car (the median over its frames) and its labelled box "
            r"against the car's LiDAR accumulated over the clip, scored as in Table~\ref{tab:main} by a "
            r"re-implementation of the protocol; means, and the paired difference (cuboid $-$ labelled box) with a "
-           r"95\,\% bootstrap interval.")
+           r"95\,\% bootstrap interval. These cars are every labelled car matched to a classical object in at least "
+           r"three frames, with at least 100 LiDAR points: a set other than the reconstructed cars of "
+           r"Table~\ref{tab:main}, on which the labelled boxes therefore score differently.")
 
 
 def latex_table(cols, caption, label):
     rows = [("frames", lambda c: f"{c['frames']}"),
-            ("labelled moving objects (object-frames)", lambda c: f"{c['labelled']}"),
+            ("labelled object-frames", lambda c: f"{c['labelled']}"),
             ("recall / precision", lambda c: f"{c['recall']:.2f} / {c['precision']:.2f}"),
             ("centre error (m)", lambda c: f"{c['centre']:.2f}"),
             (r"heading error (mod $180^\circ$)", lambda c: f"{c['yaw']:.1f}$^\\circ$"),
@@ -38,12 +36,13 @@ def latex_table(cols, caption, label):
             ("size error $L$ / $W$ / $H$ (m)", lambda c: f"{c['dl']:.2f} / {c['dw']:.2f} / {c['dh']:.2f}"),
             None,
             ("cars against the LiDAR", lambda c: f"{c['cars']}"),
-            ("solid IoU, raw: cuboid / labelled box", lambda c: f"{c['ours_raw']:.3f} / {c['box_raw']:.3f}"),
-            ("solid IoU, gap-closed: cuboid / labelled box",
+            ("solid IoU raw, cuboid / box", lambda c: f"{c['ours_raw']:.3f} / {c['box_raw']:.3f}"),
+            ("solid IoU closed, cuboid / box",
              lambda c: f"{c['ours_closed']:.3f} / {c['box_closed']:.3f}"),
-            ("footprint IoU: cuboid / labelled box", lambda c: f"{c['ours_fp']:.2f} / {c['box_fp']:.2f}"),
-            (r"paired $\Delta$ solid IoU, gap-closed", lambda c: f"${c['d']:+.3f}$ $[{c['lo']:+.3f}, {c['hi']:+.3f}]$")]
+            ("footprint IoU, cuboid / box", lambda c: f"{c['ours_fp']:.2f} / {c['box_fp']:.2f}"),
+            (r"paired $\Delta$ IoU closed", lambda c: f"${c['d']:+.3f}$ $[{c['lo']:+.3f}, {c['hi']:+.3f}]$")]
     lines = [r"\begin{table}[t]", r"\centering", r"\caption{" + caption + "}", r"\label{" + label + "}", r"\small",
+             r"\setlength{\tabcolsep}{4pt}",
              r"\begin{tabular}{lcc}", r"\toprule", f" & {cols[0]['name']} & {cols[1]['name']} \\\\", r"\midrule"]
     for row in rows:
         lines.append(r"\midrule" if row is None else f"{row[0]} & {row[1](cols[0])} & {row[1](cols[1])} \\\\")

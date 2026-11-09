@@ -20,7 +20,7 @@ triangulation of the objects that move past a fixed, calibrated, elevated camera
 of the video its masked surface is triangulated, its planar rigid motion and the depth of every vertex solved
 jointly, with the scale from the cuboid; the windows of one object are then solved together as one rigid body,
 mirrored about its symmetry plane, and completed by the visual hull of its masks. Only symmetry is assumed, so the
-same steps reconstruct cars, cyclists, motorcyclists and pedestrians. To measure the reconstruction rather than a detector, the experiments take the masks and cuboids from a precise annotation of each video (masks segmented inside the labelled 2D boxes, cuboids fitted to the LiDAR); a classical input from the video alone is evaluated separately. On 237 cars of two public datasets, recorded at seven intersections, the models are
+same steps reconstruct cars, cyclists, motorcyclists and pedestrians. A classical way to obtain them from the video is described and evaluated; any other can replace it. On 237 cars of two public datasets, recorded at seven intersections, the models are
 ahead of the labelled 3D boxes scored the same way against the cars' accumulated LiDAR on all four sets, with paired
 bootstrap intervals clear of zero (by $+0.064$ on DAIR-V2X-C and $+0.026$ on V2X-Seq-SPD, also on the clips that
 informed no design choice). The evaluation also shows that the raw accumulated LiDAR is a strongly biased reference at

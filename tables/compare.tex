@@ -5,7 +5,7 @@
 \setlength{\tabcolsep}{3pt}
 \footnotesize
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-\begin{tabular}{L{3.7cm}L{1.5cm}L{1.6cm}L{1.4cm}L{3.0cm}}
+\begin{tabular}{L{3.6cm}L{1.5cm}L{1.6cm}L{1.4cm}L{3.0cm}}
 \toprule
 family & training data & input & output & main limitation here \\
 \midrule
@@ -15,7 +15,7 @@ geometric box lifting \cite{deep3dbox,lift,efficient_orig} & 2D labels or none &
 learned shape models \cite{kar2015,deepmanta,rcnn3d} & CAD / 3D shapes & one image & shape & shape prior; not shown at 60~m \\
 visual hull, space carving \cite{laurentini,spacecarving} & none & many cameras & shape & needs widely spread views \\
 multibody SfM \cite{ozden2010,kumar2017} & none & video & points / depth & sparse, no closed shape \\
-classical moving-object detection \cite{moving_orig,dubska2014} (the input here) & none & video of a fixed camera & masks, 3D box & merges touching cars of one colour and motion; misses stopped ones \\
+classical moving-object detection \cite{moving_orig,dubska2014} (Sect.~\ref{sec:classical}) & none & video of a fixed camera & masks, 3D box & merges touching cars of one colour and motion; misses stopped ones \\
 \textbf{ours} & none & video of a fixed camera & closed shape & needs motion; length of end-on cars from the cuboid \\
 \bottomrule
 \end{tabular}
