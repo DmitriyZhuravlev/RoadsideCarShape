@@ -1,0 +1,25 @@
+\begin{table}[t]
+\centering
+\caption{A classical input (Appendix~\ref{sec:classical}) on all frames of intersections A and B: background subtraction (GSOC), colour and optical-flow segments merged into objects \cite{moving_orig}, each object's cuboid built from the tangents of its silhouette to the three vanishing points \cite{dubska2014}, tracks; no learned component, the labels and the LiDAR read for this evaluation only. Top: against the labelled boxes of the moving road users (at least 1~m/s, within 80~m, not truncated), matched per frame within 3~m (on B within 6~m: its labels lag the image by the camera--LiDAR clock offset, Sect.~\ref{sec:limits}); medians. Bottom: the classical cuboid of each matched car (the median over its frames) and its labelled box against the car's LiDAR accumulated over the clip, scored as in Table~\ref{tab:main} by a re-implementation of the protocol; means, and the paired difference (cuboid $-$ labelled box) with a 95\,\% bootstrap interval.}
+\label{tab:classical}
+\small
+\begin{tabular}{lcc}
+\toprule
+ & intersection A & intersection B \\
+\midrule
+frames & 250 & 83 \\
+labelled moving objects (object-frames) & 1851 & 529 \\
+recall / precision & 0.35 / 0.59 & 0.69 / 0.56 \\
+centre error (m) & 1.75 & 2.85 \\
+heading error (mod $180^\circ$) & 7.4$^\circ$ & 1.4$^\circ$ \\
+2D box IoU & 0.67 & 0.62 \\
+size error $L$ / $W$ / $H$ (m) & 0.38 / 0.14 / 0.14 & 0.48 / 0.12 / 0.25 \\
+\midrule
+cars against the LiDAR & 30 & 26 \\
+solid IoU, raw: cuboid / labelled box & 0.344 / 0.388 & 0.325 / 0.333 \\
+solid IoU, gap-closed: cuboid / labelled box & 0.475 / 0.545 & 0.432 / 0.450 \\
+footprint IoU: cuboid / labelled box & 0.62 / 0.76 & 0.55 / 0.60 \\
+paired $\Delta$ solid IoU, gap-closed & $-0.070$ $[-0.120, -0.028]$ & $-0.018$ $[-0.058, +0.016]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
