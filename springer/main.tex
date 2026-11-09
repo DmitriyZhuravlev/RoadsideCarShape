@@ -6,7 +6,6 @@
 \usepackage{xcolor}%
 \usepackage{booktabs}%
 \usepackage{array}%
-\usepackage[title]{appendix}%
 \usepackage{adjustbox}%
 \usepackage{tikz}%
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds}%
@@ -174,7 +173,8 @@ with yaw change $\theta_j$, translation $\vect{t}_j \in \R^2$ and the car's cent
 % ------------------------------------------------------------------------------------------------------------------
 \section{Method}
 
-The method has five steps (Fig.~\ref{fig:pipeline}). The masks and cuboids of the moving objects are given (Sect.~\ref{sec:input}, Fig.~\ref{fig:overview} top); the visible surface of every object is triangulated in
+The method has five steps (Fig.~\ref{fig:pipeline}). The masks and cuboids of the moving objects are given (Sect.~\ref{sec:input},
+Fig.~\ref{fig:overview} top; a classical way to obtain them in Sect.~\ref{sec:classical}); the visible surface of every object is triangulated in
 3D in short windows of the video (Sect.~\ref{sec:window}, Fig.~\ref{fig:overview} bottom); its orientation comes from
 its motion (Sect.~\ref{sec:heading}, Fig.~\ref{fig:heading}); the windows of one object are solved together as one
 rigid body (Sect.~\ref{sec:fusion}); and what the camera never sees is completed from symmetry, the masks and the
@@ -225,11 +225,77 @@ the masks segmented inside the labelled 2D boxes (by SAM~2 \cite{sam2} for the c
 object's own LiDAR points frame by frame (the dataset's labelled cuboid where there are too few), and the tracks from
 the labels' identities. The input is therefore not independent of the reference: the cuboids give the reconstruction
 its scale and position from the same LiDAR it is evaluated against (Sect.~\ref{sec:protocol}), and its comparison with
-the labelled boxes measures the shape added to a box of good size and position, not the gain over a detector. A classical input from the video alone, with no labels and no LiDAR, is described in Appendix~\ref{sec:classical} and evaluated on its own in Table~\ref{tab:classical}.
+the labelled boxes measures the shape added to a box of good size and position, not the gain over a detector. A classical input from the video alone, with no labels and no LiDAR, is described in Sect.~\ref{sec:classical} and evaluated on its own in Table~\ref{tab:classical}.
 A window is built at every frame in which the object is neither occluded nor
 cut by the image border. The method uses the cuboid's position and size; its heading serves
 only to decide which triangulated points lie inside it (Sect.~\ref{sec:window}), and the orientation of the object
 comes from its motion (Sect.~\ref{sec:heading}).
+
+\subsection{A classical input}\label{sec:classical}
+
+The masks and cuboids evaluated in Table~\ref{tab:classical} are obtained from the video alone; the labels and the
+LiDAR are read only to evaluate them. The method follows the moving-object detection and segmentation of
+\cite{moving_orig}, segments of coherent optical flow merged into objects while they fit an object type, with the
+lifting replaced by the tangent construction of \cite{dubska2014} and a track stage added; it runs at half resolution
+(Fig.~\ref{fig:classical_steps}).
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.88\textwidth]{classical_steps.png}
+\caption{The classical input around one car of intersection A (frame 010871): (a) the frame; (b) the foreground of
+the background subtraction, with the car's shadow on the wet road; (c) the colour segmentation; (d) the optical flow,
+its direction as hue and its speed as value; (e) the segments, foreground lying inside one colour and one motion (the
+shadow forms segments of its own); (f) the object's mask, merged from the car's segments without the shadow, and the
+cuboid built around it.}
+\label{fig:classical_steps}
+\end{figure}
+
+\paragraph{Segments.} Three segmentations of every frame are intersected. The foreground comes from a background
+subtractor that keeps for every pixel samples of its colour and of its local binary patterns and adapts its
+thresholds by feedback (GSOC, after SuBSENSE \cite{subsense}); the colour segmentation is a $k$-means quantisation of
+the frame's Lab colours; and, as in \cite{moving_orig}, the dense optical flow \cite{farneback} is coded in HSV, its
+direction as hue and its magnitude as value, and quantised by $k$-means. A segment is a connected region that is
+foreground and lies wholly inside one colour segment and one moving flow segment; a segment much smaller than a car
+at its distance joins its largest neighbour that moves alike.
+
+\paragraph{Objects and cuboids.} Starting from the largest, neighbouring segments that move alike are merged into an
+object one at a time, each time the one whose merge fits an object type best, and the best of these merges is kept
+\cite{moving_orig}; a large segment of another colour that widens the object is another car's body and is not merged.
+The cuboid of an object is built around its silhouette (Fig.~\ref{fig:classical_tangents}). Its axes are the direction
+of motion, from the optical flow on the road, the lateral and the vertical direction, and each has a vanishing point;
+the two tangents from a vanishing point to the silhouette are the images of two planes through the camera centre that
+touch the box along an edge \cite{dubska2014}. With the calibrated camera each tangency is a linear equation in the
+box's extents along the two horizontal axes and its height: six tangents for five unknowns, solved by least squares,
+with the edge each tangent touches assigned from the current box and the solve repeated. The size is measured, and
+the object's type is the one whose average size it deviates least from; that deviation also decides the merging. (The
+lifting of \cite{moving_orig}, which fixes the type's length and inscribes the footprint in the inverse perspective
+quadrangle of the 2D box, leaves the width undetermined for a car that crosses the view far away.) On the wet road a
+car's mirror image is cut off at the contact line, below which the image is the car mirrored and blurred, and the
+tangents along a nearer object are left out.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.55\textwidth]{classical_tangents.png}
+\caption{The cuboid built around a car's silhouette (white): the tangents from the vanishing points of the direction
+of motion (red), the lateral (green) and the vertical direction (blue) touch the box along its edges (dots); the
+measured size is given above the image.}
+\label{fig:classical_tangents}
+\end{figure}
+
+\paragraph{Tracks.} The objects are linked in the image, each track's 2D box moved by its optical flow. Per track, the
+heading is the flow's direction of motion averaged over the neighbouring frames, and the size is the median of the
+measured sizes. A track is predicted along its smoothed path, also a few frames beyond its ends: an object whose box
+holds the predictions of two tracks, two cars that touch in some frames, is divided between them, and a frame without
+an object of the track gets its prediction (Fig.~\ref{fig:classical_tracks}).
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{classical_tracks.png}
+\caption{Two cars of different colour, a beige sedan and a white car partly behind it, in four frames of
+intersection A. Top: in a single frame they are one object, or none. Bottom: with the tracks, built where the cars are
+apart and predicted into these frames, each has its own cuboid (``(track)'': placed by its track).}
+\label{fig:classical_tracks}
+\end{figure}
 
 \subsection{Triangulation of one window}\label{sec:window}
 
@@ -737,7 +803,7 @@ size of the model and of the LiDAR box.}
 \end{figure}
 
 \paragraph{A classical input.} Table~\ref{tab:classical} evaluates masks and cuboids obtained from the video
-alone (Appendix~\ref{sec:classical}), segments of coherent optical flow, colour and foreground merged into objects
+alone (Sect.~\ref{sec:classical}), segments of coherent optical flow, colour and foreground merged into objects
 \cite{moving_orig} and cuboids built from the tangents of each silhouette to the three vanishing points
 \cite{dubska2014}, on all frames of intersections A and B. Of the moving
 road users within 80~m it finds 35\,\% on A at a precision of 0.59, and 69\,\% at 0.56 on B, where the labels lag the
@@ -748,7 +814,7 @@ as one object, cars whose lower part is hidden behind a car in front, and stoppe
 
 \begin{table}[t]
 \centering
-\caption{A classical input (Appendix~\ref{sec:classical}) on all frames of intersections A and B: background subtraction (GSOC), colour and optical-flow segments merged into objects \cite{moving_orig}, each object's cuboid built from the tangents of its silhouette to the three vanishing points \cite{dubska2014}, tracks; no learned component, the labels and the LiDAR read for this evaluation only. Top: against the labelled boxes of the moving road users (at least 1~m/s, within 80~m, not truncated), matched per frame within 3~m (on B within 6~m: its labels lag the image by the camera--LiDAR clock offset, Sect.~\ref{sec:limits}); medians. Bottom: the classical cuboid of each matched car (the median over its frames) and its labelled box against the car's LiDAR accumulated over the clip, scored as in Table~\ref{tab:main} by a re-implementation of the protocol; means, and the paired difference (cuboid $-$ labelled box) with a 95\,\% bootstrap interval.}
+\caption{A classical input (Sect.~\ref{sec:classical}) on all frames of intersections A and B: background subtraction (GSOC), colour and optical-flow segments merged into objects \cite{moving_orig}, each object's cuboid built from the tangents of its silhouette to the three vanishing points \cite{dubska2014}, tracks; no learned component, the labels and the LiDAR read for this evaluation only. Top: against the labelled boxes of the moving road users (at least 1~m/s, within 80~m, not truncated), matched per frame within 3~m (on B within 6~m: its labels lag the image by the camera--LiDAR clock offset, Sect.~\ref{sec:limits}); medians. Bottom: the classical cuboid of each matched car (the median over its frames) and its labelled box against the car's LiDAR accumulated over the clip, scored as in Table~\ref{tab:main} by a re-implementation of the protocol; means, and the paired difference (cuboid $-$ labelled box) with a 95\,\% bootstrap interval.}
 \label{tab:classical}
 \small
 \begin{tabular}{lcc}
@@ -878,75 +944,6 @@ author read and approved the final manuscript.
 
 \bmhead{Acknowledgements}
 Not applicable.
-
-\begin{appendices}
-
-\section{A classical input}\label{sec:classical}
-
-The masks and cuboids evaluated in Table~\ref{tab:classical} are obtained from the video alone; the labels and the
-LiDAR are read only to evaluate them. The method follows the moving-object detection and segmentation of
-\cite{moving_orig}, segments of coherent optical flow merged into objects while they fit an object type, with the
-lifting replaced by the tangent construction of \cite{dubska2014} and a track stage added; it runs at half resolution
-(Fig.~\ref{fig:classical_steps}).
-
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=\textwidth]{classical_steps.png}
-\caption{The classical input on one frame of intersection A: (a) the frame; (b) the foreground of the background
-subtraction; (c) the colour segmentation; (d) the optical flow, its direction as hue and its speed as value; (e) the
-segments, foreground lying inside one colour and one motion; (f) the objects' masks and the cuboids built around
-them.}
-\label{fig:classical_steps}
-\end{figure}
-
-\paragraph{Segments.} Three segmentations of every frame are intersected. The foreground comes from a background
-subtractor that keeps for every pixel samples of its colour and of its local binary patterns and adapts its
-thresholds by feedback (GSOC, after SuBSENSE \cite{subsense}); the colour segmentation is a $k$-means quantisation of
-the frame's Lab colours; and, as in \cite{moving_orig}, the dense optical flow \cite{farneback} is coded in HSV, its
-direction as hue and its magnitude as value, and quantised by $k$-means. A segment is a connected region that is
-foreground and lies wholly inside one colour segment and one moving flow segment; a segment much smaller than a car
-at its distance joins its largest neighbour that moves alike.
-
-\paragraph{Objects and cuboids.} Starting from the largest, neighbouring segments that move alike are merged into an
-object one at a time, each time the one whose merge fits an object type best, and the best of these merges is kept
-\cite{moving_orig}; a large segment of another colour that widens the object is another car's body and is not merged.
-The cuboid of an object is built around its silhouette (Fig.~\ref{fig:classical_tangents}). Its axes are the direction
-of motion, from the optical flow on the road, the lateral and the vertical direction, and each has a vanishing point;
-the two tangents from a vanishing point to the silhouette are the images of two planes through the camera centre that
-touch the box along an edge \cite{dubska2014}. With the calibrated camera each tangency is a linear equation in the
-box's extents along the two horizontal axes and its height: six tangents for five unknowns, solved by least squares,
-with the edge each tangent touches assigned from the current box and the solve repeated. The size is measured, and
-the object's type is the one whose average size it deviates least from; that deviation also decides the merging. (The
-lifting of \cite{moving_orig}, which fixes the type's length and inscribes the footprint in the inverse perspective
-quadrangle of the 2D box, leaves the width undetermined for a car that crosses the view far away.) On the wet road a
-car's mirror image is cut off at the contact line, below which the image is the car mirrored and blurred, and the
-tangents along a nearer object are left out.
-
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=0.62\textwidth]{classical_tangents.png}
-\caption{The cuboid built around a car's silhouette (white): the tangents from the vanishing points of the direction
-of motion (red), the lateral (green) and the vertical direction (blue) touch the box along its edges (dots); the
-measured size is given above the image.}
-\label{fig:classical_tangents}
-\end{figure}
-
-\paragraph{Tracks.} The objects are linked in the image, each track's 2D box moved by its optical flow. Per track, the
-heading is the flow's direction of motion averaged over the neighbouring frames, and the size is the median of the
-measured sizes. A track is predicted along its smoothed path, also a few frames beyond its ends: an object whose box
-holds the predictions of two tracks, two cars that touch in some frames, is divided between them, and a frame without
-an object of the track gets its prediction (Fig.~\ref{fig:classical_tracks}).
-
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=0.85\textwidth]{classical_tracks.png}
-\caption{Two cars of different colour, a beige sedan and a white car partly behind it, in four frames of
-intersection A. Top: in a single frame they are one object, or none. Bottom: with the tracks, built where the cars are
-apart and predicted into these frames, each has its own cuboid (``(track)'': placed by its track).}
-\label{fig:classical_tracks}
-\end{figure}
-
-\end{appendices}
 
 \bibliography{references}
 

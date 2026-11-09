@@ -15,7 +15,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "tables", "classical_input.tex")
 N_BOOT, SEED = 5000, 0
-CAPTION = (r"A classical input (Appendix~\ref{sec:classical}) on all frames of intersections A and B: background "
+CAPTION = (r"A classical input (Sect.~\ref{sec:classical}) on all frames of intersections A and B: background "
            r"subtraction (GSOC), colour and optical-flow segments merged into objects \cite{moving_orig}, each "
            r"object's cuboid built from "
            r"the tangents of its silhouette to the three vanishing points \cite{dubska2014}, tracks; no learned "
