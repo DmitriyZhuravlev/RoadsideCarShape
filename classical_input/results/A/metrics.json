@@ -1,20 +1,20 @@
 {
  "frames": 250,
  "labelled moving objects (object-frames)": 1851,
- "our objects": 1099,
- "matched": 645,
- "recall": 0.34846029173419774,
- "precision": 0.5868971792538672,
- "median centre error m": 1.74538511750349,
- "median yaw error deg (mod 180)": 7.445497174420882,
- "median 2D box IoU": 0.6720218090981722,
- "median |dl| m": 0.3768963263550704,
- "median |dw| m": 0.1436877958637961,
- "median |dh| m": 0.14328208261150222,
- "class agreement (car / large / two-wheeler / pedestrian)": 0.8651162790697674,
+ "our objects": 1068,
+ "matched": 713,
+ "recall": 0.38519719070772557,
+ "precision": 0.6676029962546817,
+ "median centre error m": 1.6353589641879944,
+ "median yaw error deg (mod 180)": 3.50440871365656,
+ "median 2D box IoU": 0.6821672605046484,
+ "median |dl| m": 0.6134329998270864,
+ "median |dw| m": 0.22237231942358737,
+ "median |dh| m": 0.17502152986196085,
+ "class agreement (car / large / two-wheeler / pedestrian)": 0.9158485273492286,
  "matched range m (min, median, max)": [
-  17.5185609368104,
-  63.68341661739027,
-  79.83091026625517
+  17.802183612513588,
+  63.78369639612789,
+  79.74875421692192
  ]
 }

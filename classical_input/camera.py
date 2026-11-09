@@ -13,6 +13,8 @@ import os
 import cv2
 import numpy as np
 
+LENS = os.environ.get("LENS", "0") == "1"   # the dataset's images are already undistorted: cam_D off
+
 
 def lzf_decompress(data, out_len):
     """LibLZF decompression (PCL's DATA binary_compressed)."""
@@ -97,7 +99,9 @@ class Camera:
         intr = json.load(open(os.path.join(root, "calib/camera_intrinsic", fid + ".json")))
         ext = json.load(open(os.path.join(root, "calib/virtuallidar_to_camera", fid + ".json")))
         self.K = np.array(intr["cam_K"], float).reshape(3, 3)
-        self.D = np.array(intr["cam_D"], float)
+        # only with LENS=1: the images are already undistorted (the labelled 2D boxes are the pinhole projections of
+        # the 3D boxes to 0.1 px), so applying cam_D again would distort them twice
+        self.D = np.array(intr["cam_D"], float) if LENS else np.zeros(5)
         self.size = (intr["width"], intr["height"])
         # V -> camera: X_c = M X_v + t. M is the dataset's "rotation"; it is not orthonormal (row norms 1.00 and 0.84
         # on V2X-Seq-SPD), so it is kept as the linear map it is and never turned into a rotation vector.

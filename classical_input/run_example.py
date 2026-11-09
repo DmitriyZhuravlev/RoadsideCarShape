@@ -269,7 +269,7 @@ def main():
     ofc.temporal_split(cam, results, tuple(int(round(s * ofc.SCALE)) for s in frames[0].shape[:2]))
     for fid, objs in zip(clip, results):
         save(fid, objs, cam, frames[0].shape[:2])
-    metrics, labs = evaluate(cam, clip, results)
+    metrics, labs = evaluate(cam, clip, results, gate=float(os.environ.get("EVAL_GATE", "3")))   # 6 on DAIR-V2X-C
     json.dump(metrics, open(os.path.join(OUT, "metrics.json"), "w"), indent=1)
     print(json.dumps(metrics, indent=1))
     figures(cam, clip, frames, results, debug, labs, show=SHOW, bg=bg)
