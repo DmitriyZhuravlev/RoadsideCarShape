@@ -89,7 +89,7 @@ def main():
     # main table: our models against boxes scored the same way
     lines = [r"\begin{table}[t]", r"\centering",
              r"\caption{Cars against their accumulated LiDAR (mean over the evaluated cars). IoU against the raw and the"
-             r" gap-closed reference, footprint IoU and height error against the closed one, size errors against the"
+             r" gap-closed reference, footprint IoU and height error against the gap-closed one, size errors against the"
              r" labelled box. The labelled box and a box of our own estimated size are scored in the same way. A car"
              r" the tracker split into two tracks counts twice (Table~\ref{tab:paired} keeps its longer track).}",
              r"\label{tab:main}", r"\setlength{\tabcolsep}{4pt}",

@@ -64,7 +64,7 @@ def main():
         lines = crop.copy()
         for t in T:
             q = (o["uv"][t] - [X0, Y0]) * s_
-            cv2.polylines(lines, [np.round(q * 4).astype(np.int32)], True, (0, 215, 255), 1, cv2.LINE_AA, shift=2)
+            cv2.polylines(lines, [np.round(q * 4).astype(np.int32)], True, (168, 95, 31), 1, cv2.LINE_AA, shift=2)
         crop = cv2.addWeighted(lines, 0.7, crop, 0.3, 0)
         # the same new viewpoint for the window's triangles and the fused model (world coordinates of frame k)
         cam = seq.cams[k]
