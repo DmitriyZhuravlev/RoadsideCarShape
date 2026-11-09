@@ -26,6 +26,7 @@ from scipy.optimize import linear_sum_assignment
 
 import camera
 import foreground
+import master_input
 import ofc
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
@@ -34,7 +35,10 @@ FIRST = int(sys.argv[2]) if len(sys.argv) > 2 else 20
 N = int(sys.argv[3]) if len(sys.argv) > 3 else 25
 SHOW = 10              # the frame of the clip shown step by step
 FG = os.environ.get("FG", "gsoc")   # foreground: mean, median, gsoc, lsbp (foreground.py)
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
+CONTOURS = os.environ.get("CONTOURS", "own")      # "own", or "master": the contours from master_input (smoother,
+                                                  # but on the 60-frame clip precision 0.62 instead of 0.70)
+OUT = os.environ.get("OUT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "out"))
+VIDEO = os.environ.get("VIDEO", "1") == "1"
 EDGES = [(0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7)]
 COLOURS = plt.get_cmap("tab10").colors
 
@@ -69,7 +73,8 @@ def overlay(img, cam, objs):
 
 def labels(cam, fid):
     """Evaluation only: the labelled objects of a frame in the road frame, with their 2D boxes."""
-    L = json.load(open(os.path.join(ROOT, "label/virtuallidar", fid + ".json")))
+    lidar = os.path.join(ROOT, "label/virtuallidar", fid + ".json")      # DAIR-V2X-C in this layout: label/camera only
+    L = json.load(open(lidar if os.path.exists(lidar) else os.path.join(ROOT, "label/camera", fid + ".json")))
     B = {o["track_id"]: o for o in json.load(open(os.path.join(ROOT, "label/camera", fid + ".json")))}
     out = []
     for o in L:
@@ -244,12 +249,16 @@ def main():
                                set(range(FIRST, FIRST + N)))
     os.makedirs(OUT, exist_ok=True)
     cv2.imwrite(os.path.join(OUT, "background.png"), bg)
+    if CONTOURS == "master":
+        bg_master = master_input.median_background([os.path.join(ROOT, "image", f + ".jpg") for f in fids])
     print(f"foreground: {FG}, background model of {len(fids)} frames")
     prev = cv2.imread(os.path.join(ROOT, "image", fids[FIRST - 1] + ".jpg"))
     frames, results, debug = [], [], []
     for k, fid in enumerate(clip):
         img = cv2.imread(os.path.join(ROOT, "image", fid + ".jpg"))
         objs, dbg = ofc.detect(cam, prev, img, bg, fgs[FIRST + k])
+        if CONTOURS == "master":
+            objs = ofc.adopt_masks(cam, objs, master_input.instance_masks(prev, img, bg_master), img, prev)
         frames.append(img)
         results.append(objs)
         debug.append(dbg if len(frames) == SHOW + 1 else None)     # the masks of every segment are large
@@ -264,7 +273,8 @@ def main():
     json.dump(metrics, open(os.path.join(OUT, "metrics.json"), "w"), indent=1)
     print(json.dumps(metrics, indent=1))
     figures(cam, clip, frames, results, debug, labs, show=SHOW, bg=bg)
-    video(cam, clip, frames, results)
+    if VIDEO:
+        video(cam, clip, frames, results)
 
 
 if __name__ == "__main__":

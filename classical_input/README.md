@@ -126,16 +126,40 @@ per frame by footprint centre (Hungarian, ≤ 3 m).
 
 **The 6-second clip, frames 010719–010778 (559 labelled object-frames), GSOC:**
 
-| | before the depth fix | **now** |
-| :--- | ---: | ---: |
-| our objects / matched | 358 / 171 | 343 / 240 |
-| recall / precision | 0.31 / 0.48 | **0.43 / 0.70** |
-| median centre error | 1.49 m | 1.60 m |
-| median yaw error (mod 180°) | 8.2° | 7.0° |
-| median 2D box IoU | 0.62 | **0.71** |
-| median size error l / w / h | 0.30 / 0.18 / 0.18 m | 0.46 / 0.21 / 0.17 m |
-| class agreement (car / large / two-wheeler / pedestrian) | 0.79 | 0.79 |
-| along-ray bias of the cars at 60–80 m | +2.0 m | +0.7 m |
+| | before the depth fix | after it | **+ heading along the track, solid masks** |
+| :--- | ---: | ---: | ---: |
+| our objects / matched | 358 / 171 | 343 / 240 | 365 / 252 |
+| recall / precision | 0.31 / 0.48 | 0.43 / 0.70 | **0.45 / 0.69** |
+| median centre error | 1.49 m | 1.60 m | 1.55 m |
+| median yaw error (mod 180°) | 8.2° | 7.0° | **5.1°** |
+| median 2D box IoU | 0.62 | 0.71 | **0.72** |
+| median size error l / w / h | 0.30 / 0.18 / 0.18 m | 0.46 / 0.21 / 0.17 m | 0.40 / 0.19 / 0.14 m |
+| class agreement (car / large / two-wheeler / pedestrian) | 0.79 | 0.79 | 0.80 |
+| along-ray bias of the cars at 60–80 m | +2.0 m | +0.7 m | |
+
+**Heading along the track.** The track refinement took the heading from the tangent of the track's path; a far
+car's centre jumps along the viewing ray from frame to frame, and the tangent with it (10–20° on the first 25
+frames). The heading is now the flow's direction of motion averaged over ±3 frames of the track (modulo 180°).
+**Solid masks:** an object's mask is the union of its segments, with gaps and holes (windows, lights that joined no
+segment); it is now closed and its holes filled. The cuboid is fitted to the convex hull, which this does not change.
+
+**The masks of the research code (`master_input.py`).** The research code's classical pipeline (`code/whole_scene.py`
+with `SEG=mask`: median background, reflection cut by edge energy, flow and colour split, merge by one affine motion,
+HSV shadow test, full resolution) gives better masks of single cars: against the labelled 2D boxes of moving cars
+(frames 010719–010743) box IoU 0.44 against 0.35, found (IoU ≥ 0.5) 0.38 against 0.31, mask below the box (shadow,
+reflection) 3.7 % against 5.3 %. It merges far cars more often and its thresholds (1.5 px/frame, 600 px) drop small far
+objects. Combined with this module, on the 60 frames:
+
+| combination | recall / precision | yaw | 2D box IoU | length error |
+| :--- | ---: | ---: | ---: | ---: |
+| its instances, lifted and split here | 0.29 / 0.73 (25 frames) | | | |
+| its foreground into the segmentation here | 0.28 / 0.74 (25 frames) | | | |
+| detection here, contours from it where one car (`CONTOURS=master`) | 0.40 / 0.62 | 5.0° | 0.69 | 0.46 m |
+| **detection and contours here** (default) | **0.43 / 0.70** | **4.1°** | **0.71** | **0.42 m** |
+
+Its contours are smoother, but the cuboids fitted to them are not better; the default keeps this module's. Tried and
+dropped as well: cutting the dark, flat band at the bottom of a mask as shadow (precision 0.83 → 0.74 on 25 frames: a
+car's own shadow under its body holds the tyre contact, and the cut lifts the box).
 
 **The depth bias and its fix.** Before the fix, cars crossing the view at 60–80 m stood a median 2.1 m too far along
 the viewing ray, growing over the clip to +4.0 m, and three quarters of the "false" detections were such cars 3–6 m
@@ -151,6 +175,25 @@ the ray, measured 0.7 m too large (the size a high camera sees worst for a cross
 lower part is hidden behind a car in the near lane. Such tangents are now left out where the silhouette borders a
 detected object in front (`relift_hidden`), but the car in front is often not detected itself. Tried and dropped: a
 firmer width prior (weight 0.5): the late bias rose to +1.7 m and the boxes fitted worse.
+
+**Against the LiDAR, as in the article's Table 1** (`eval_lidar.py`, written from the article's Sect. 5, not from its
+code; `out/lidar_eval.json`). Per labelled car, its LiDAR points over the 60 frames in its box frame, mirrored, a
+height field of 5 cm columns, gaps closed with a radius of 15 cm; a box is compared as the height field of its
+footprint, both centred. Our cuboid of a car is the median of our cuboids matched to it (≤ 3 m, ≥ 3 frames). Cars of
+intersection A within 80 m:
+
+| solid IoU | raw | gap-closed |
+| :--- | ---: | ---: |
+| our classical cuboid (8 cars) | 0.36 | 0.48 |
+| labelled box, same 8 cars | 0.41 | 0.57 |
+| our cuboid, the 6 cars it gives a car's size | 0.40 | 0.52 |
+| labelled box, the same 6 cars | 0.40 | 0.54 |
+| *article, A (24 cars, whole sequence): labelled box / box of the shape model's size / shape model* | *0.35 / 0.35 / 0.41* | *0.55 / 0.59 / 0.65* |
+
+Paired, gap-closed, ours − labelled box: −0.09 [−0.18, −0.01] on the 8 cars. Where the classical cuboid has a car's
+size it is about as good a box as the labelled one (−0.02); the loss comes from the cars whose cuboid is too long (a
+neighbour merged in, or a hidden part).
+The sample is small and the protocol is a re-implementation; the shape models themselves are not compared here.
 
 Remaining failure modes:
 

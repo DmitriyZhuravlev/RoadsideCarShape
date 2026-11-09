@@ -37,6 +37,7 @@ def masks(method, paths, keep):
         stack = np.stack(frames)
         bg = (stack.mean(0) if method == "mean" else np.median(stack, axis=0)).round().astype(np.uint8)
         return {k: ofc.foreground(frames[k], bg) for k in keep}, bg
+    cv2.setRNGSeed(0)                                    # the sample-based models draw random samples: reproducible
     sub = subtractor(method)
     out = {}
     for rnd in range(2):

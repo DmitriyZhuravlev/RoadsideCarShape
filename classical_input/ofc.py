@@ -30,6 +30,7 @@ Over a clip, objects are linked into tracks by their footprint centres and each 
 """
 import cv2
 import numpy as np
+from scipy.ndimage import binary_fill_holes
 
 # average sizes (length, width, height) in m of the object types
 TYPES = {"Car": (4.5, 1.8, 1.5), "Van": (5.0, 1.95, 1.95), "Truck": (8.0, 2.5, 3.0), "Bus": (11.0, 2.55, 3.2),
@@ -63,13 +64,16 @@ TRIALS = 8             # neighbours tried per merge step (the largest of those m
 E_TIE = 0.03           # of merges fitting about equally well as the same type, the larger is kept
 DUPLICATE = 0.3        # two objects whose 2D boxes overlap by this share of the smaller are tried as one
 TRACK_MIN = 3          # objects per track for the track's heading and size
+ADOPT_COVER = 0.5      # an instance mask covering this share of an object's mask gives it its contour ...
+ADOPT_GROW = 1.5       # ... unless it is more than this many times larger (several cars merged)
 REFLECTION_GAP = 1.0   # m: a mirror image below an object lifts to a footprint touching the object's
 CONTAINED = 0.7        # share of an object's 2D box inside a larger object's box that makes it a piece of that one
 MIRROR_NCC = 0.55      # the rows below a candidate contact line correlate this well with the rows above, mirrored:
                        # the mask below it is the object's mirror image on the wet road ...
 MIRROR_BLUR = 0.7      # ... if its edges are at most this share of those above (a reflection is blurred)
 TRACK_PATH = 1.5       # m: a track that moved less keeps its per-frame headings
-TRACK_SPEED = 0.3      # m/frame: slower along its path, an object keeps its flow's direction
+TRACK_SPEED = 0.3      # m/frame: slower along its path, an extrapolated object keeps its median direction
+HEADING_WIN = 3        # frames on each side over which a track's flow directions are averaged
 EXTRAP = 5             # frames a track is extrapolated beyond its ends to split a merged object
 LINK_GAP = 3           # frames a track survives without an object
 LINK_IOU = 0.3         # IoU of an object's 2D box with a track's box moved by its flow that links them
@@ -367,6 +371,13 @@ def contact_line(gray, m, x0, y0, x1, y1):
     return row
 
 
+def solid(m):
+    """The object's mask as one region: the gaps between its segments closed and its holes filled (a window or a
+    light that joined no segment). The cuboid is fitted to the convex hull, which this does not change."""
+    c = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)) > 0
+    return binary_fill_holes(c) & cv2.dilate(m.astype(np.uint8), np.ones((9, 9), np.uint8)).astype(bool)
+
+
 def fit_mask(cam, m, flow, shape, gray, occ=None, cut_mirror=True):
     """Box, direction and LIFT of a half-resolution mask m moving with the mean flow `flow`, its mirror image on the
     wet road cut off at the contact line. occ (bool, half resolution): where the silhouette borders it, it is
@@ -400,7 +411,7 @@ def fit_mask(cam, m, flow, shape, gray, occ=None, cut_mirror=True):
     yaw = direction(cam, box, flow)
     r = lift(cam, hull, box, yaw, occluded=occluded) if yaw is not None else None
     if r is not None:
-        r.update(mask=m, box=box, flow=flow, hull=hull, occluded=occluded)
+        r.update(mask=solid(m), box=box, flow=flow, hull=hull, occluded=occluded)
     return r
 
 
@@ -746,10 +757,10 @@ def link(frames, max_gap=LINK_GAP, min_iou=LINK_IOU):
 
 
 def refine_tracks(cam, frames):
-    """Per track of at least TRACK_MIN objects: the heading in every frame from the track's path (the tangent of a
-    quadratic in time fitted to the centres, when the track moved at least TRACK_PATH m; a turning car turns its box)
-    instead of one frame's flow, the size as the median of the measured sizes, the type as the one this size deviates
-    least from, and in every frame the centre solved again by the tangents with this heading and size."""
+    """Per track of at least TRACK_MIN objects: the heading in every frame as the flow's direction averaged over the
+    neighbouring frames of the track (a turning car turns its box), the size as the median of the measured sizes, the
+    type as the one this size deviates least from, and in every frame the centre solved again by the tangents with
+    this heading and size."""
     tracks = {}
     for k, objs in enumerate(frames):
         for o in objs:
@@ -762,15 +773,13 @@ def refine_tracks(cam, frames):
         lwh = tuple(np.median([o["lwh"] for o in objs], axis=0))
         t = min(TYPES, key=lambda k: size_deviation(lwh, k))
         C = np.array([o["centre"] for o in objs])
-        headings = [o["yaw"] for o in objs]
         deg = 2 if len(ks) >= 5 else 1
         px, py = (np.polyfit(ks, C[:, i], deg) for i in (0, 1))      # the smoothed path
-        if np.linalg.norm(C[-1] - C[0]) >= TRACK_PATH:
-            dx, dy = np.polyder(px), np.polyder(py)
-            # the path's tangent where the track moves; a car that is just starting keeps its flow's direction
-            headings = [float(np.arctan2(np.polyval(dy, k), np.polyval(dx, k)))
-                        if np.hypot(np.polyval(dx, k), np.polyval(dy, k)) >= TRACK_SPEED else o["yaw"]
-                        for k, o in zip(ks, objs)]
+        # the heading: the flow's direction of motion smoothed over +-HEADING_WIN frames of the track (a circular mean
+        # modulo 180 deg); the path's tangent is noisier, a far car's centre jumps along the viewing ray
+        y2 = 2 * np.array([o["yaw"] for o in objs])
+        headings = [float(0.5 * np.arctan2(np.sin(y2[w]).mean(), np.cos(y2[w]).mean()))
+                    for w in (np.abs(ks - k) <= HEADING_WIN for k in ks)]
         for k, o, heading in zip(ks, objs, headings):
             r = lift(cam, o["hull"], o["box"], heading, fixed=lwh, centre=o["centre"], occluded=o["occluded"])
             # a silhouette that cannot hold the track's box was a piece of the object: the box on the smoothed path
@@ -899,3 +908,71 @@ def temporal_split(cam, frames, shape):
                             "lwh": m["lwh"], "box": pb, "mask": part > 0, "error": 0.0, "tangent_rms": np.inf,
                             "segments": 0, "flow": np.zeros(2), "predicted": True})
         frames[k] = out
+
+
+def detect_instances(cam, prev_bgr, bgr, masks):
+    """Objects from given instance masks (full resolution, bool; master_input.instance_masks): each is lifted by the
+    tangent construction (the mirror image cut at the contact line first); an instance that holds two cars is split
+    (split_two_bodies), and one that fits no type is tried for a split before it is dropped. Then the post-processing
+    of detect: pieces inside larger objects and mirror images dropped, the tangents hidden behind an object in front
+    left out. Returns the objects and the intermediate images."""
+    prev_img, img = half(prev_bgr), half(bgr)
+    F = optical_flow(prev_img, img)
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    shape = F.shape[:2]
+    objects = []
+    for m in sorted(masks, key=lambda m: -int(m.sum())):
+        mh = cv2.resize(m.astype(np.uint8), shape[::-1], interpolation=cv2.INTER_NEAREST) > 0
+        if mh.sum() < MIN_AREA:
+            continue
+        flow = F[mh].mean(0)
+        r = fit_mask(cam, mh, flow, shape, gray)
+        if r is None or r["error"] > E_ACCEPT:
+            ys, xs = np.nonzero(mh)                      # no type fits: perhaps two cars; a stand-in for the split
+            g = cam.ipm(np.array([[0.5 * (xs.min() + xs.max()) / SCALE, (ys.max() + 1) / SCALE]]))[0]
+            if not np.isfinite(g).all():
+                continue
+            parts = split_two_bodies(cam, {"mask": mh, "centre": g, "ids": [], "segments": 1}, F, lab, shape, gray)
+            parts = [p for p in parts if "type" in p]
+        else:
+            r.update(segments=1, ids=[])
+            parts = split_two_bodies(cam, r, F, lab, shape, gray)
+        for p in parts:
+            if all(footprint_overlap(p, o) < 0.2 for o in objects):
+                objects.append(p)
+    objects = relift_hidden(cam, drop_contained(drop_reflections(objects)), shape)
+    return objects, {"flow": F, "instances": masks}
+
+
+def adopt_masks(cam, objects, masks, bgr, prev_bgr, max_grow=ADOPT_GROW, min_cover=ADOPT_COVER):
+    """The contours of objects from instance masks (full resolution; master_input.instance_masks: full-resolution
+    foreground, reflection cut, shadow removed): an object adopts the instance that covers at least min_cover of its
+    mask if that instance is at most max_grow times larger (not several cars merged), and is lifted again from it.
+    The detection and the splitting stay this module's; only the silhouette changes."""
+    if not masks:
+        return objects
+    prev_img, img = half(prev_bgr), half(bgr)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    shape = img.shape[:2]
+    hm = [cv2.resize(m.astype(np.uint8), shape[::-1], interpolation=cv2.INTER_NEAREST) > 0 for m in masks]
+    used = set()
+    for o in sorted(objects, key=lambda o: -int(o["mask"].sum())):
+        if "hull" not in o:
+            continue
+        a = int(o["mask"].sum())
+        cover = [(int((o["mask"] & m).sum()) / max(a, 1), j) for j, m in enumerate(hm) if j not in used]
+        if not cover:
+            continue
+        c, j = max(cover)
+        if c < min_cover or hm[j].sum() > max_grow * a:
+            continue
+        others = [p["mask"] for p in objects if p is not o]
+        occ = cv2.dilate(np.any(others, axis=0).astype(np.uint8), np.ones((7, 7), np.uint8)) > 0 if others else None
+        r = fit_mask(cam, hm[j], o["flow"], shape, gray, occ)
+        if r is not None and r["error"] <= E_ACCEPT:
+            keep = {k: o[k] for k in ("ids", "segments", "split") if k in o}
+            o.clear()
+            o.update(r, **keep)
+            used.add(j)
+    return objects
