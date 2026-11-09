@@ -112,7 +112,7 @@ The method takes, for every moving object, its mask and its 3D cuboid in each fr
 \cite{dubska_diamond_space,dubska2014,dubska2015,sochor} or from 2D boxes lifted to the road by inverse perspective
 mapping (IPM) \cite{lift,efficient_orig}. We describe a classical way to obtain them (Sect.~\ref{sec:classical});
 a stronger detector and segmenter can replace it where better results are needed. A cuboid gives position, size and
-heading, but not the shape; the method adds the 3D shape inside it, from the whole video and without learning
+heading, but not the shape; the method adds the 3D shape inside it, from the frames in which the object passes and without learning
 (Fig.~\ref{fig:teaser}).
 
 \begin{figure}[t]
@@ -140,7 +140,7 @@ that make it possible here are:
   the top edge of each silhouette is the far edge of the roof, so the hull raises the near half of the roof by about
   $\tfrac{W}{2}\tan\epsilon$; the roof is therefore measured at that edge, and the length is measured only where the car
   is seen side-on (Sect.~\ref{sec:completion});
-\item \emph{one rigid body per video}: all windows of a track share one pose per frame and are fused, with the
+\item \emph{one rigid body per track}: all windows of a track share one pose per frame and are fused, with the
   symmetry plane, into a weighted-median height field: triangulated where the car is textured, the corrected hull
   where it is not (Sects.~\ref{sec:fusion}--\ref{sec:completion});
 \item \emph{an unbiased LiDAR reference}: the raw accumulated LiDAR is strongly biased at long range (the labelled box
@@ -221,11 +221,11 @@ cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:syst
   \draw[arr] (solve) -- (track); \draw[arr] (track) -- (sym); \draw[arr] (sym) -- (hull); \draw[arr] (hull) -- (model);
   \begin{scope}[on background layer]
     \node[draw=blue!40, dashed, rounded corners, fit=(seg)(mesh)(solve), inner sep=2.5mm, label={[font=\footnotesize]above:one window (Sect.~\ref{sec:window})}] {};
-    \node[draw=orange!60, dashed, rounded corners, fit=(track)(sym)(hull), inner sep=2.5mm, label={[font=\footnotesize]below:whole video, per car (Sect.~\ref{sec:fusion})}] {};
+    \node[draw=orange!60, dashed, rounded corners, fit=(track)(sym)(hull), inner sep=2.5mm, label={[font=\footnotesize]below:all frames of one car (Sect.~\ref{sec:fusion})}] {};
   \end{scope}
 \end{tikzpicture}}
 \caption{The pipeline. Every window of $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
-are then fused over the whole video (orange). No step of the reconstruction is learned.}
+are then fused over all frames that see it (orange). No step of the reconstruction is learned.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -879,8 +879,8 @@ From a single fixed, elevated roadside camera, with no learned step, the 3D shap
 can be triangulated from their masks and cuboids: measured against the cars' own LiDAR at up to 70~m, the car models
 are ahead of the labelled 3D boxes on both intersections the method was developed on and on \DairCars{} cars of
 DAIR-V2X-C, and by a smaller margin on \SpdCars{} cars of V2X-Seq-SPD. Three ingredients carry it: the object's own
-motion, which turns one camera into many views of its textured surface; the whole video, solved as one rigid body and
-completed by symmetry and by the masks' carve; and, only where the video never measured the length, the cuboid. As
+motion, which turns one camera into many views of its textured surface; all frames that see the object, solved as one rigid
+body and completed by symmetry and by the masks' carve; and, only where the video never measured the length, the cuboid. As
 only symmetry is assumed, the same steps give cyclists, motorcyclists and pedestrians. The evaluation also shows that
 the raw accumulated LiDAR is a biased reference at long range and should be closed before it is used to compare
 shapes. The masks and cuboids can come from any source: the classical input
