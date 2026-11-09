@@ -19,7 +19,7 @@ import v2x_seq_demo as vd  # noqa: E402
 
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 RUN, LAB, K_WIN = "ann_P_clip_114_0_all", "000046", int(os.environ.get("K_WIN", "142"))
-RUN_COL = RUN + "_sub2"                                     # the same model, subdivided and coloured (MESH_SUBDIV=2)
+RUN_COL = RUN + "_fill"     # the same model, subdivided and coloured (MESH_SUBDIV=2, FILL_UP=1)
 DUMPS = f"{D}/ann_objects_P_clip_114_0_all"
 GRID = float(os.environ.get("GRID", "0.14"))               # m: vertex clustering of the shown mesh
 W, H = 1400, 788                                            # panel size, 16:9

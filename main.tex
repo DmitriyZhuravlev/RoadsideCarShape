@@ -79,8 +79,8 @@ heading, but not the shape; the method adds the 3D shape inside it, from the fra
 \caption{One car of DAIR-V2X-C reconstructed from a single roadside camera (clip 114\_0, car 000046): (a) a frame of
 the video; (b) the triangle mesh of the model fused over its 62 windows (shown coarsened); (c, d) the model with the
 colours of the video, from the same viewpoint as (b) and from the opposite one, all from $30^\circ$ above the road; the right side, seen
-in (d), is completed by symmetry. What no window saw takes a fill colour (the dark patch on the bonnet and the
-plain back, Sect.~\ref{sec:completion}). Solid IoU 0.88 against the gap-closed LiDAR; 4.8~m long against the labelled 4.4~m.}
+in (d), is completed by symmetry. What no window saw takes a fill colour (the plain back,
+Sect.~\ref{sec:completion}). Solid IoU 0.88 against the gap-closed LiDAR; 4.8~m long against the labelled 4.4~m.}
 \label{fig:teaser}
 \end{figure}
 
@@ -428,7 +428,8 @@ little off is outvoted. Before sampling a view, the model's projected outline is
 silhouette: the windows at the ends of a track are often off by tens of pixels, and without this the glass lands on
 the bonnet. A vertex and its mirror image take the better seen of the two. A vertex no window sees takes the colour of
 a nearby seen vertex; farther from one, below the belt line one body colour, and above it the median colour of the
-seen vertices at the same height --- glass at cabin height, paint on the roof.
+seen vertices at the same height --- glass at cabin height --- except that an upward-facing vertex, on the bonnet or the
+roof, takes the colour of the seen upward-facing ones, the paint.
 
 \subsection{The system of equations}\label{sec:system}
 
