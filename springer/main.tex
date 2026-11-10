@@ -77,7 +77,7 @@
 \abstract{Roadside cameras watch the same intersection for years, yet monocular 3D perception for them is almost always a
 learned detector that outputs boxes and needs thousands of labelled 3D boxes from the same kind of camera. We present
 a learning-free 3D triangulation of the objects that move past a fixed, calibrated, elevated camera. Its input is a
-mask and a 3D cuboid of every moving object per frame, from any source; we describe a classical method that obtains them. In short windows
+mask and a 3D cuboid of every moving object per frame, from any source; we describe a classical method that obtains them from the video, and evaluate the reconstruction itself on masks and cuboids derived from the datasets' labels and LiDAR. In short windows
 of the video the masked surface is triangulated, and its planar rigid motion and the depth of every vertex are solved
 jointly, with the scale fixed by the cuboid. All windows of an object are then solved together as one rigid body,
 mirrored about its symmetry plane, averaged as a robust height field and completed by a visual hull of the masks: the
@@ -112,7 +112,7 @@ The method takes, for every moving object, its mask and its 3D cuboid in each fr
 \cite{farneback,moving_orig}, cuboids from vanishing-point calibration and 3D vehicle boxes
 \cite{dubska_diamond_space,dubska2014,dubska2015,sochor} or from 2D boxes lifted to the road by inverse perspective
 mapping (IPM) \cite{lift,efficient_orig}. We describe a classical way to obtain them (Sect.~\ref{sec:classical});
-a stronger detector and segmenter can replace it where better results are needed. A cuboid gives position, size and
+a stronger detector and segmenter can replace it where better results are needed. ``Learning-free'' refers to the reconstruction: no step from the masks and cuboids to the shape is learned, and none of the classical input is. A cuboid gives position, size and
 heading, but not the shape; the method adds the 3D shape inside it, from the frames in which the object passes and without learning
 (Fig.~\ref{fig:teaser}).
 
@@ -226,7 +226,7 @@ cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:syst
   \end{scope}
 \end{tikzpicture}}
 \caption{The pipeline. Every window of $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
-are then fused over all frames that see it (orange). No step of the reconstruction is learned.}
+are then fused over all frames that see it (orange). No step of the reconstruction is learned; its input, the masks and cuboids, can be.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -237,8 +237,7 @@ height) in the frames that see it, linked into tracks. Any source can supply the
 Sect.~\ref{sec:classical}, or learned detectors and segmenters where better input is needed. In the experiments of
 Sects.~\ref{sec:protocol}--\ref{sec:results} the masks were segmented inside the labelled 2D boxes (by SAM~2
 \cite{sam2} for the cars), the cuboids fitted to each object's LiDAR points (the labelled cuboid where there were too
-few), and the tracks taken from the label identities; the comparison with the labelled boxes therefore measures what
-the reconstructed shape adds to a box of the same size and position.
+few), and the tracks taken from the label identities. SAM~2 is a learned segmenter and the cuboids use the LiDAR: this input is deliberately precise, so that the shape results measure the reconstruction alone, i.e.\ what the reconstructed shape adds to a box of the same size and position, and not the errors of a detector. The classical input is evaluated on its own, as a detector (Table~\ref{tab:classical}); shapes reconstructed from it end to end are not scored here, and will be worse where its masks and cuboids are.
 
 A window is built at every frame in which the object is neither occluded nor
 cut by the image border. The method uses the cuboid's position and size; its heading serves
@@ -855,7 +854,7 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 \section{Limitations}\label{sec:limits}
 
 \begin{itemize}
-\item \emph{Input.} The reconstruction is only as good as its masks and cuboids. The classical input misses or
+\item \emph{Input.} The reconstruction is only as good as its masks and cuboids. The shape results use precise input (SAM~2 masks, LiDAR-fitted cuboids, labelled tracks; Sect.~\ref{sec:input}), so they measure the learning-free reconstruction and not a complete learning-free system; the shapes of the chain from the video alone are not scored. The classical input misses or
   merges cars in dense traffic (Table~\ref{tab:classical}); a stronger detector and segmenter can replace it. Stopped
   objects have no parallax and are not reconstructed, and 26 of 224 cars of the larger evaluation are occluded too often to have
   five windows.
@@ -880,16 +879,14 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 % ------------------------------------------------------------------------------------------------------------------
 \section{Conclusion}
 
-From a single fixed, elevated roadside camera, with no learned step, the 3D shapes of the objects that move past it
-can be triangulated from their masks and cuboids: measured against the cars' own LiDAR at up to 70~m, the car models
+From a single fixed, elevated roadside camera, the 3D shapes of the objects that move past it can be triangulated from their masks and cuboids with no learned step: given precise masks and cuboids and measured against the cars' own LiDAR at up to 70~m, the car models
 are ahead of the labelled 3D boxes on both intersections the method was developed on and on \DairCars{} cars of
 DAIR-V2X-C, and by a smaller margin on \SpdCars{} cars of V2X-Seq-SPD. Three ingredients carry it: the object's own
 motion, which turns one camera into many views of its textured surface; all frames that see the object, solved as one rigid
 body and completed by symmetry and by the masks' carve; and, only where the video never measured the length, the cuboid. As
 only symmetry is assumed, the same steps give cyclists, motorcyclists and pedestrians. The evaluation also shows that
 the raw accumulated LiDAR is a biased reference at long range and should be closed before it is used to compare
-shapes. The masks and cuboids can come from any source: the classical input
-described here gives cuboids that score 0.01--0.06 below the labelled boxes against the LiDAR, and a stronger
+shapes. The masks and cuboids can come from any source; those of the shape results came from SAM~2 and the LiDAR. The classical input described here, from the video alone, gives cuboids that score 0.01--0.06 below the labelled boxes against the LiDAR, and a stronger
 detector can replace it where needed.
 
 \backmatter
