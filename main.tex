@@ -182,7 +182,7 @@ cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:syst
     \node[draw=orange!60, dashed, rounded corners, fit=(track)(sym)(hull), inner sep=2.5mm, label={[font=\footnotesize]below:all frames of one car (Sect.~\ref{sec:fusion})}] {};
   \end{scope}
 \end{tikzpicture}}
-\caption{The pipeline. Every window of $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
+\caption{The pipeline. Every window of up to $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
 are then fused over all frames that see it (orange). No step of the reconstruction is learned; its input, the masks and cuboids, can be.}
 \label{fig:pipeline}
 \end{figure}
@@ -217,8 +217,7 @@ speed as value; (d) the segments, foreground lying inside one colour and one mot
 own); (e) the object's mask, merged from the car's segments without the shadow, its silhouette (white) and the cuboid
 built around it: the tangents from the vanishing points of the direction of motion (red), the lateral (green) and the
 vertical direction (blue) touch the box along its edges (dots), and the box's size is measured; (f) the body
-triangulation of its window (Sect.~\ref{sec:window}): vertices on a grid inside the eroded mask, tracked through
-$\pm 8$ frames, triangulated by Delaunay.}
+triangulation of its window (Sect.~\ref{sec:window}): vertices on a grid inside the eroded mask, tracked through up to $\pm 8$ frames, triangulated by Delaunay.}
 \label{fig:classical_steps}
 \end{figure}
 
@@ -254,8 +253,7 @@ an object of the track gets its prediction.
 \subsection{Triangulation of one window}\label{sec:window}
 
 \paragraph{The surface and its mesh.} The mask of the reference frame, slightly eroded so that no vertex lies on its
-outline, receives a regular grid of vertices, triangulated by Delaunay. Every vertex is tracked through the window of
-$\pm 8$ frames with pyramidal Lucas--Kanade \cite{lucas_kanade} and a forward--backward check, and kept if it is
+outline, receives a regular grid of vertices, triangulated by Delaunay. The window is at most $\pm 8$ frames around the reference frame; for a fast or near object it is shortened to the frames in which the object moves at most 100~px in the image from the reference, but not below $\pm 3$ frames (a longer window of 200~px did not change the shapes). Every vertex is tracked through the window with pyramidal Lucas--Kanade \cite{lucas_kanade} and a forward--backward check, and kept if it is
 followed in most of them.
 
 \paragraph{Joint solve.} The unknowns are the motion $\vect{m}_j = (\theta_j, \vect{t}_j)$ of the car in every frame
@@ -382,7 +380,7 @@ thin. A median filter and the largest connected component finish the field.
 \paragraph{Cabin from the masks.} The triangulated field covers the textured surface; the glass and the roof are often too
 dark or too uniform to track. The silhouette of the object in every frame is its mask; the masks of the frames in
 which the object is unoccluded and inside the image carve. Voxels are kept if they, and their mirror images, project
-inside the mask in at least 95\,\% of the frames that see them (a visual hull \cite{laurentini}); for a car never seen side-on, whose length the cuboid bounds (\emph{Length} below), 80\,\% suffice, as the strict vote would only cut away volume; the top of the kept voxels is
+inside the mask in at least 75\,\% of the frames that see them (a visual hull \cite{laurentini} with a soft vote: the masks and poses are not exact, and a strict vote of 95\,\% cuts away volume and lowers the IoU on A by 0.01); the top of the kept voxels is
 the cabin field, and the model is the higher of the triangulated and cabin fields. A high camera sees a car from
 nearly the same direction in all frames, so the cone of one silhouette is long along the viewing ray and rises toward
 the camera; the hull is therefore capped a little above the cuboid's height. For near objects the silhouettes alone
@@ -402,7 +400,7 @@ the car.
 scale-free features (length to height, share of the length under the roof, height of the front and rear) and a type
 by fixed rules: sedan, hatchback, SUV or van. For a car seen from the side the width lies nearly along the viewing
 ray, where a single camera measures it worst; the width is therefore bounded about the symmetry plane by the type's
-typical width with its mirrors, which the LiDAR sees and a cuboid fitted to the body leaves out.
+typical width with its mirrors, which the LiDAR sees and a cuboid fitted to the body leaves out. The cabin is narrower than the body, and its near upper edge is never seen against the background; across the car the field is therefore capped by a fixed profile, a roof over 72\,\% of the width and sides that lean inward above the belt line at 62\,\% of the height. Without this taper the IoU falls by 0.002 on A and 0.024 on B.
 
 \paragraph{Length.} The length is measured only where the car is seen side-on, i.e.\ where the viewing ray crosses the car at a large angle. A car seen
 side-on in fewer than two windows --- most often a car seen only from behind --- has a length and a profile the video
@@ -434,7 +432,7 @@ roof, takes the colour of the seen upward-facing ones, the paint.
 
 For one object, with masks $M_g$ and cuboids $B_g$ in its frames $g$, the method solves in turn:
 \begin{enumerate}
-\item \emph{each window} $w$ (reference frame $r_w$, frames $r_w \pm 8$): Eq.~(\ref{eq:energy}) over the motion
+\item \emph{each window} $w$ (reference frame $r_w$, frames within $r_w \pm 8$): Eq.~(\ref{eq:energy}) over the motion
   $\vect{m}_j$ and the depths $s_i$ of the vertices, with the vertices bounded between the road and the height of a
   car (below the road for the mirror image on a wet road), started from the IPM of the lowest vertices;
 \item \emph{its scale}: $\sigma_w = \arg\max_{\sigma} \big|\{ i : \vect{C} + \sigma (\vect{X}_i - \vect{C})
@@ -451,7 +449,7 @@ For one object, with masks $M_g$ and cuboids $B_g$ in its frames $g$, the method
   width.
 \end{enumerate}
 Steps 1 and 4 are non-linear least squares; every residual enters through the soft-$\ell_1$ loss, and they are solved
-by a trust-region method with bounds and a sparse Jacobian. Steps 2, 3 and 5 are closed-form or a one-dimensional
+by a trust-region method with bounds and a sparse finite-difference Jacobian, stopped after a fixed number of evaluations (60 for a window, 40 for a track; 200 for a track did not improve the shapes). Steps 2, 3 and 5 are closed-form or a one-dimensional
 search. The weights and thresholds were set once on intersection A and are the same for every object and dataset.
 
 % ------------------------------------------------------------------------------------------------------------------
@@ -464,8 +462,7 @@ wet road). \emph{Intersection B} is the infrastructure side of the DAIR-V2X-C ex
 
 \paragraph{Tuning.} The parameters were chosen on intersection A. Three design choices also looked at B and at five
 clips of the larger evaluation (Sect.~\ref{sec:results}): the length cap only for cars never seen side-on, rather than
-for every car (chosen on A, B and the five clips); the softer hull vote for those cars (Sect.~\ref{sec:completion};
-chosen on A and B); and the joint solve of a track (adopted after it improved A, B and one of the five clips). Ideas
+for every car (chosen on A, B and the five clips); the soft hull vote (Sect.~\ref{sec:completion}; chosen on A and B); and the joint solve of a track (adopted after it improved A, B and one of the five clips). Ideas
 that did not help on A and B were dropped. B is therefore not a clean hold-out; for the larger evaluation we also report the clips that
 informed no choice.
 
@@ -511,7 +508,7 @@ the same way: the labelled box, a box of our own estimated length, width and hei
 without averaging and symmetry. All \Acars{} moving cars of A with a LiDAR reference are scored; a car is paired
 with its label over its whole track. A is the tuning set, so this comparison is in-sample. Against the gap-closed reference our models reach
 \AsixClosed{}, above the labelled boxes (\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the
-shape adds to the dimensions. A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
+shape adds to the dimensions. The cuboids that the method was given as input, scored in the same way, reach 0.567 on A and 0.556 on B: the models are ahead of their own input by 0.078 [0.052, 0.103] on A (22 of 24 cars) and 0.081 [0.065, 0.097] on B (15 of 15). A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
 (Fig.~\ref{fig:steps}). Figure~\ref{fig:cars} shows four of the models up close, drawn into their frames, with their LiDAR.
 
 \paragraph{Intersection B.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
