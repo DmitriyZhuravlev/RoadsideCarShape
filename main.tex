@@ -77,11 +77,11 @@ heading, but not the shape; the method adds the 3D shape inside it, from the fra
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{teaser.png}
-\caption{One car of DAIR-V2X-C reconstructed from a single roadside camera (clip 114\_0, car 000046): (a) a frame of
-the video; (b) the triangle mesh of the model fused over its 62 windows (shown coarsened); (c, d) the model with the
+\caption{One car of DAIR-V2X-C reconstructed end to end from the video of a single roadside camera, with the classical input (clip 114\_0, car 000046): (a) a frame of
+the video; (b) the triangle mesh of the model fused over its 28 windows (shown coarsened); (c, d) the model with the
 colours of the video, from the same viewpoint as (b) and from the opposite one, all from $30^\circ$ above the road; the right side, seen
 in (d), is completed by symmetry. What no window saw takes a fill colour (the plain back,
-Sect.~\ref{sec:completion}). Solid IoU 0.88 against the gap-closed LiDAR; 4.8~m long against the labelled 4.4~m.}
+Sect.~\ref{sec:completion}). Solid IoU 0.77 against the gap-closed LiDAR; 4.7~m long against the labelled 4.4~m.}
 \label{fig:teaser}
 \end{figure}
 
@@ -299,9 +299,8 @@ cuboid fixes where the object is and how large; its shape still comes from the t
 \centering
 \includegraphics[width=\textwidth]{heading.png}
 \caption{Orientation from motion, intersection A. (a) The path of every car and its heading from the track solve
-(blue arrows), with the input cuboids (grey, ``evaluation'' in the legend); (b) a turning car up close. The
-heading follows the direction of travel through the turn; median error against the labelled yaw $4.6^\circ$ over
-the 24 cars of A.}
+(blue arrows), with the labelled cuboids (grey, evaluation only); (b) a turning car up close. The
+heading follows the direction of travel through the turn; median error against the labelled yaw $3.2^\circ$ over the 8 cars of A reconstructed from the classical input.}
 \label{fig:heading}
 \end{figure}
 
@@ -361,7 +360,7 @@ shared pose of its reference frame, with no further alignment.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{method_steps.png}
-\caption{From triangulation to model, three cars of intersection A. Left: the body triangulation in one frame.
+\caption{From triangulation to model, two cars of intersection A, from the classical input. Left: the body triangulation in one frame.
 Middle: the same triangles in 3D after the window's joint solve, from a new viewpoint --- one window is noisy along
 the viewing rays. Right: the model fused over all windows of the car (one rigid car, symmetry, weighted-median height
 field, cabin from silhouettes, Poisson surface, video colours), from the same viewpoint.}
@@ -510,7 +509,7 @@ without averaging and symmetry. All \Acars{} moving cars of A with a LiDAR refer
 with its label over its whole track. A is the tuning set, so this comparison is in-sample. Against the gap-closed reference our models reach
 \AsixClosed{}, above the labelled boxes (\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the
 shape adds to the dimensions. The cuboids that the method was given as input, scored in the same way, reach 0.567 on A and 0.556 on B: the models are ahead of their own input by 0.078 [0.052, 0.103] on A (22 of 24 cars) and 0.081 [0.065, 0.097] on B (15 of 15). A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
-(Fig.~\ref{fig:steps}). Figure~\ref{fig:cars} shows four of the models up close, drawn into their frames, with their LiDAR.
+(Fig.~\ref{fig:steps}).
 
 \paragraph{Intersection B.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
 labelled boxes (Table~\ref{tab:main}). B is harder than A: all \Bcars{} cars drive away from the camera and are seen
@@ -554,8 +553,7 @@ V2X-Seq-SPD.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{cars_best.png}
-\caption{Four representative cars of intersection A: a van, an SUV, a hatchback and a sedan, each shown in the frame
-where it is largest and unoccluded. Left to right: the video; our model drawn into the same frame; the model from a
+\caption{Four cars of intersection A reconstructed end to end from the classical input: a van, a hatchback and two sedans, each shown in a frame where it is unoccluded. Left to right: the video; our model drawn into the same frame; the model from a
 new viewpoint, with the colours of the video pixels; the model with the car's accumulated LiDAR (red, evaluation
 only) and the solid IoU against it.}
 \label{fig:cars}
@@ -592,14 +590,12 @@ our models are ahead at every intersection of both datasets, by the smallest mar
 V2X-Seq-SPD (yz06), where many cars creep through the intersection and come out too long (Sect.~\ref{sec:limits});
 against the raw reference the labelled box is marginally ahead at three intersections of V2X-Seq-SPD. Of the 224 cars of these clips with a
 LiDAR reference, 198 are scored; the other 26 are occluded or cut by the image border in too many frames to have
-the five windows a model needs. Figure~\ref{fig:large} shows eight car models of both datasets next to the cars in
-the video.
+the five windows a model needs. Figure~\ref{fig:large} shows eight car models of both datasets next to the cars in the video, these reconstructed from the classical input (Table~\ref{tab:e2e}).
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=\textwidth]{best_models.png}
-\caption{Eight car models of both datasets. Per car: the video frame with
-the car framed; the model with the original pixels of its best views from the front left and from the rear left; its
+\caption{Eight car models of both datasets, reconstructed end to end from the classical input. Per car: a video frame of the car; the model with the original pixels of its best views from the front left and from the rear left; its
 solid IoU against the gap-closed LiDAR and its length against the labelled length.}
 \label{fig:large}
 \end{figure}
@@ -654,15 +650,8 @@ length is off by a mean of \ClsALerr{}~m on A and \ClsBLerr{}~m on B, and the he
 \ClsBHerr{}~cm (11~cm on B with the precise input). The reconstruction is the same in both evaluations, so the
 difference lies in the input: the cabin is carved from the masks and every window is scaled by its cuboid
 (Sects.~\ref{sec:window} and~\ref{sec:completion}), and the errors of either go directly into the model.
-Figure~\ref{fig:e2e} shows four models of A obtained this way.
+Figures~\ref{fig:teaser}, \ref{fig:steps}, \ref{fig:cars} and~\ref{fig:large} show models obtained this way.
 
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=\textwidth]{cars_best_new.png}
-\caption{Four cars of intersection A reconstructed end to end from the classical input (cars 003976, 003985, 004009
-and 003892). Columns as in Fig.~\ref{fig:cars}.}
-\label{fig:e2e}
-\end{figure}
 
 % ------------------------------------------------------------------------------------------------------------------
 \section{Comparison with Other Approaches}\label{sec:comparison}
