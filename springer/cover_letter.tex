@@ -23,8 +23,8 @@ solved jointly, with the scale from the cuboid; the windows of one car are then 
 mirrored about its symmetry plane, and completed by the visual hull of its masks. No step is learned. On 54 cars of
 two public datasets, scored against the cars' accumulated LiDAR, the models are level with the labelled 3D boxes
 (a mean solid IoU of 0.608 against 0.611, paired difference $-0.003$ $[-0.031, +0.025]$), ahead of the cuboids of
-the classical input on the two intersections it was developed on, far above a single window (0.303), and closer to the LiDAR surface in height than the cuboids. An
-ablation reports what each part contributes, including the parts that do not pay off with classical masks. The
+the classical input on the two intersections it was developed on, far above a single window (0.303), and closer to the LiDAR surface in height than the cuboids. On 15 cars of three sequences held out until the method was frozen the models reach 0.609, against 0.542 for
+the labelled boxes and 0.606 for their input cuboids. An ablation reports what each part contributes, including the parts that do not pay off with classical masks. The
 evaluation also shows that the raw accumulated LiDAR is a strongly biased reference at long range, against which
 the labelled box itself scores only 0.37, and the manuscript reports its limits openly: the classical masks and
 cuboids limit the result, ten of the 24 cars of the tuning intersection get a model, and other road users are

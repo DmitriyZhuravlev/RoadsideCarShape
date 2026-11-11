@@ -15,12 +15,19 @@ DOCS = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tables_cls")
 T = "fb_noba"
 FURTHER = ("c114", "s0054", "s0059", "s0077", "s0002")
+HOLDOUT = tuple(n for n in ("s0020", "s0070", "s0092")       # run after the method was frozen
+                if os.path.exists(os.path.join(DOCS, f"whole_scene_cars_ann_{n}_{T}.json")))
 SETS = [("A", "intersection A", ("Acls",)), ("B", "intersection B", ("B",)), ("F", "further clips", FURTHER),
-        ("T", "all", ("Acls", "B") + FURTHER)]
+        ("T", "all", ("Acls", "B") + FURTHER), ("H", "held-out clips", HOLDOUT)]
 CLIPS = [("intersection A", "seq.\\ 0058", "Acls"), ("intersection B", "example clip", "B"),
          ("further clips", "clip 114\\_0", "c114"), ("", "seq.\\ 0054", "s0054"),
          ("", "seq.\\ 0059", "s0059"), ("", "seq.\\ 0077", "s0077"), ("", "seq.\\ 0002", "s0002"),
+         ("held-out", "seq.\\ 0020", "s0020"), ("", "seq.\\ 0070", "s0070"), ("", "seq.\\ 0092", "s0092"),
          ("repeats", "clip 105\\_0 (in 0059)", "c105"), ("", "clip 52\\_1 (in 0002)", "c52")]
+CLIPS = [c for c in CLIPS if os.path.exists(os.path.join(DOCS, f"whole_scene_cars_ann_{c[2]}_{T}.json"))]
+for i in range(1, len(CLIPS)):                      # a group whose first clip is missing keeps its name
+    if CLIPS[i][0] == "" and CLIPS[i][2] in ("s0070", "s0092") and CLIPS[i - 1][2] not in ("s0020", "s0070"):
+        CLIPS[i] = ("held-out",) + CLIPS[i][1:]
 KEYS = [("Ours", "fused closed: iou"), ("Lab", "box label closed: iou"), ("Own", "box own closed: iou"),
         ("Input", "box input closed: iou"), ("Single", "single closed: iou"), ("OursRaw", "fused: iou"),
         ("LabRaw", "box label: iou"), ("Scanned", "fused closed: scanned_iou"),
@@ -76,7 +83,12 @@ def column(R, key):
 def main():
     os.makedirs(OUT, exist_ok=True)
     macros, body = {}, []
+    names = [n[1:] for n in HOLDOUT]                      # the held-out sequences that were run
+    macros["ClsHClips"] = {1: "one", 2: "two", 3: "three"}.get(len(names), str(len(names)))
+    macros["ClsHNames"] = (", ".join(names[:-1]) + " and " + names[-1]) if len(names) > 1 else "".join(names)
     for s, title, runs in SETS:
+        if not runs:                                      # no held-out run yet: no row and no macros
+            continue
         R = list(cars(runs).values())
         col = {k: column(R, key) for k, key in KEYS}
         for k in col:
@@ -97,14 +109,14 @@ def main():
         macros[f"Cls{s}RangeMax"] = f"{np.nanmax(column(R, 'range_m')):.0f}"
         row = (f"{title} & {len(R)} & " + " & ".join(macros[f"Cls{s}{k}"] for k in TABLE)
                + f" & {fmt_ci(*ci['Lab'][:3])} & {fmt_ci(*ci['Input'][:3])} \\\\")
-        body.append(("\\midrule\n" if s == "T" else "") + row)
+        body.append(("\\midrule\n" if s in ("T", "H") else "") + row)
         print(title, len(R), {k: macros[f"Cls{s}{k}"] for k in TABLE}, macros[f"Cls{s}DLab"], macros[f"Cls{s}DInput"])
     lines = [r"\begin{table}[t]", r"\centering",
              r"\caption{Car models from the video alone against their accumulated LiDAR: mean solid IoU against the "
              r"gap-closed reference. The labelled box, a box of our own estimated size, the input cuboid of the "
              r"classical method and the best single window are scored in the same way; the last two columns pair our "
              r"models with the labelled box and with their input cuboid on the same cars (mean difference, 95\,\% "
-             r"bootstrap interval, 5000 resamples). Every car counts once.}",
+             r"bootstrap interval, 5000 resamples). Every car counts once; the held-out clips were run after the method was frozen and are not in `all'.}",
              r"\label{tab:main}", r"\setlength{\tabcolsep}{3pt}", r"\resizebox{\textwidth}{!}{%",
              r"\begin{tabular}{lrccccccc}", r"\toprule",
              r" & cars & ours & labelled & box of & input & single & ours $-$ labelled & ours $-$ input \\",
@@ -116,7 +128,7 @@ def main():
     for group, clip, run in CLIPS:
         R = list(cars((run,)).values())
         m = lambda key: f"{np.nanmean(column(R, key)):.3f}"
-        rows.append(("\\midrule\n" if group == "repeats" else "")
+        rows.append(("\\midrule\n" if group in ("repeats", "held-out") else "")
                     + f"{group} & {clip} & {len(R)} & {m('fused: iou')} & {m('box label: iou')} & "
                     f"{m('fused closed: iou')} & {m('box label closed: iou')} & {m('box input closed: iou')} & "
                     f"{np.nanmedian(np.abs(column(R, 'pose: along-ray err m'))):.2f} \\\\")
@@ -133,11 +145,12 @@ def main():
     open(os.path.join(OUT, "clips_table.tex"), "w").write("\n".join(lines) + "\n")
 
     # ablation: mean IoU per set and the paired difference to the full method on the cars scored in both
-    full = {s: cars(runs) for s, _, runs in SETS}
+    DEV = [x for x in SETS if x[0] != "H"]
+    full = {s: cars(runs) for s, _, runs in DEV}
     rows = []
     for name, tag in ABLATION:
         cells = []
-        for s, _, runs in SETS:
+        for s, _, runs in DEV:
             C = cars(runs, tag)
             cells.append(float(np.mean([r["fused closed: iou"] for r in C.values()])))
             if s == "T":

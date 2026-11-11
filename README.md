@@ -26,7 +26,9 @@ same cars, and every car counts once (two DAIR-V2X-C clips show the same video a
 reported only as repeats). Over all cars the models are level with the labelled boxes (paired difference
 -0.003 [-0.031, +0.025], 95 % bootstrap interval) and ahead of their input cuboids on the two intersections
 (+0.085 [+0.027, +0.139] on A, +0.033 [+0.016, +0.052] on B; +0.022 [-0.005, +0.050] over all cars); their
-surface is closer to the LiDAR in height than the cuboids' flat top (28 against 36 cm). The ablation shows that the
+surface is closer to the LiDAR in height than the cuboids' flat top (28 against 36 cm). On 15 cars of three sequences held out until the method was frozen the models reach 0.609, against
+0.542 for the labelled boxes (+0.067 [-0.001, +0.137]) and 0.606 for their input cuboids: level with the labelled
+boxes or better, and level with their input. The ablation shows that the
 cabin carved from the silhouettes carries the method; a joint solve of all windows of a car as one rigid body did
 not pay off with classical masks and is not part of the method. The main limits are the classical masks and cuboids and the coverage: 10 of the
 24 cars of A with a LiDAR reference get a model. A pedestrian, a cyclist and a motorcyclist are shown as coarse

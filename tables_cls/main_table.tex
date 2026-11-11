@@ -1,6 +1,6 @@
 \begin{table}[t]
 \centering
-\caption{Car models from the video alone against their accumulated LiDAR: mean solid IoU against the gap-closed reference. The labelled box, a box of our own estimated size, the input cuboid of the classical method and the best single window are scored in the same way; the last two columns pair our models with the labelled box and with their input cuboid on the same cars (mean difference, 95\,\% bootstrap interval, 5000 resamples). Every car counts once.}
+\caption{Car models from the video alone against their accumulated LiDAR: mean solid IoU against the gap-closed reference. The labelled box, a box of our own estimated size, the input cuboid of the classical method and the best single window are scored in the same way; the last two columns pair our models with the labelled box and with their input cuboid on the same cars (mean difference, 95\,\% bootstrap interval, 5000 resamples). Every car counts once; the held-out clips were run after the method was frozen and are not in `all'.}
 \label{tab:main}
 \setlength{\tabcolsep}{3pt}
 \resizebox{\textwidth}{!}{%
@@ -14,6 +14,8 @@ intersection B & 10 & 0.544 & 0.519 & 0.515 & 0.512 & 0.367 & $+0.025$ $[-0.002,
 further clips & 34 & 0.615 & 0.647 & 0.623 & 0.615 & 0.290 & $-0.032$ $[-0.071, +0.005]$ & $+0.001$ $[-0.037, +0.039]$ \\
 \midrule
 all & 54 & 0.608 & 0.611 & 0.601 & 0.586 & 0.303 & $-0.003$ $[-0.031, +0.025]$ & $+0.022$ $[-0.005, +0.050]$ \\
+\midrule
+held-out clips & 15 & 0.609 & 0.542 & 0.611 & 0.606 & 0.343 & $+0.067$ $[-0.001, +0.137]$ & $+0.003$ $[-0.020, +0.025]$ \\
 \bottomrule
 \end{tabular}}
 \end{table}
