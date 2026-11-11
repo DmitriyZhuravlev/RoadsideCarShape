@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\caption{Ablation on the classical input: one part of the method changed or left out at a time, on the same windows; mean solid IoU against the gap-closed LiDAR, and the paired difference to the full method over all cars scored in both (95\,\% bootstrap interval).}
+\label{tab:ablation}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccccc}
+\toprule
+ & A & B & further & all & difference to full \\
+\midrule
+full method & 0.624 & 0.512 & 0.598 & 0.587 & -- \\
+silhouette: the mask & 0.602 & 0.508 & 0.569 & 0.563 & $-0.024$ $[-0.035, -0.013]$ \\
+not confined to the cuboid & 0.610 & 0.511 & 0.599 & 0.585 & $-0.002$ $[-0.010, +0.006]$ \\
+neither of the two & 0.589 & 0.507 & 0.572 & 0.563 & $-0.024$ $[-0.037, -0.012]$ \\
+no cabin carve & 0.421 & 0.437 & 0.426 & 0.427 & $-0.160$ $[-0.202, -0.116]$ \\
+no joint solve & 0.648 & 0.544 & 0.615 & 0.608 & $+0.021$ $[-0.007, +0.056]$ \\
+no symmetry & 0.611 & 0.521 & 0.607 & 0.592 & $+0.005$ $[-0.015, +0.036]$ \\
+no roof edge & 0.624 & 0.512 & 0.596 & 0.585 & $-0.002$ $[-0.005, +0.001]$ \\
+no cuboid completion & 0.624 & 0.486 & 0.585 & 0.574 & $-0.013$ $[-0.026, -0.002]$ \\
+\bottomrule
+\end{tabular}
+\end{table}

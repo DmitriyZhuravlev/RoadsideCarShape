@@ -15,17 +15,21 @@ masks. No step is learned; LiDAR and 3D labels are used for evaluation only.
 
 | Data (cars scored) | ours | labelled box | input cuboid | best single window |
 | :--- | :---: | :---: | :---: | :---: |
-| V2X-Seq-SPD example, intersection A (8; tuning) | 0.589 | 0.572 | 0.552 | 0.275 |
-| DAIR-V2X-C example, intersection B (9) | 0.507 | 0.508 | 0.504 | 0.401 |
-| DAIR-V2X-C, 3 clips (24) | 0.584 | 0.637 | 0.599 | 0.223 |
-| V2X-Seq-SPD, 4 sequences (30) | 0.554 | 0.649 | 0.617 | 0.292 |
+| V2X-Seq-SPD example, intersection A (8; tuning) | 0.624 | 0.572 | 0.552 | 0.275 |
+| DAIR-V2X-C example, intersection B (9) | 0.512 | 0.508 | 0.504 | 0.401 |
+| five further clips of both datasets (34) | 0.598 | 0.647 | 0.615 | 0.295 |
+| all (51) | 0.587 | 0.611 | 0.585 | 0.311 |
 
 Mean solid IoU of the height fields against the cars' accumulated LiDAR with the gaps between scan lines closed; the
 labelled boxes, the input cuboids of the classical method and the best single window are scored the same way on the
-same cars. The models are level with the labelled boxes on A and B (paired difference +0.017 [-0.071, +0.093] and
--0.001 [-0.080, +0.058], 95 % bootstrap intervals) and below them on the further clips (-0.053 [-0.103, -0.003] and
--0.095 [-0.158, -0.039]); they do not yet improve on their own input cuboids. The main limits are the classical
-masks and cuboids and the coverage: 8 of the 24 cars of A with a LiDAR reference get a model.
+same cars, and every car counts once (two DAIR-V2X-C clips show the same video as V2X-Seq-SPD sequences and are
+reported only as repeats). Over all cars the models are level with the labelled boxes (paired difference
+-0.024 [-0.066, +0.017], 95 % bootstrap interval) and with their input cuboids (+0.002 [-0.036, +0.039]); their
+surface is closer to the LiDAR in height than the cuboids' flat top (28 against 37 cm). The ablation shows that the
+cabin carved from the silhouettes carries the method, while the joint solve of a track and the symmetry do not
+improve the IoU with classical masks. The main limits are the classical masks and cuboids and the coverage: 8 of the
+24 cars of A with a LiDAR reference get a model. A pedestrian, a cyclist and a motorcyclist are shown as coarse
+models from their silhouettes alone.
 
 ## Contents
 
@@ -39,8 +43,8 @@ in `springer/`.
 
 ## Reproducing the tables and figures
 
-- Tables of the article: `scripts/make_tables_cls.py` writes `tables_cls/main_table.tex`, `tables_cls/clips_table.tex`
-  and `tables_cls/numbers.tex` from the per-clip results of the research repository 3dseg
+- Tables of the article: `scripts/make_tables_cls.py` writes `tables_cls/main_table.tex`, `tables_cls/clips_table.tex`,
+  `tables_cls/ablation.tex` and `tables_cls/numbers.tex` from the per-clip results of the research repository 3dseg
   (`docs/whole_scene_cars_ann_<run>_<tag>.json`); do not edit them by hand. `tables/classical_input.tex` and
   `tables/compare.tex` are also used by the article.
 - Figures of the article, all from the classical input: `scripts/teaser_figure.py` (`teaser.png`),

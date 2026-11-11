@@ -8,11 +8,11 @@ sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/s
 import cars_figure as cf
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 CLIPS = os.path.expanduser("~/Documents/MyArticles/improve_runs/clips")
-SUFFIX = "_e2e_sub2"
+SUFFIX = "_fb"
 # (dataset, classical run name, label, clip folder in improve_runs/clips)
 PICK = [("DAIR-V2X-C", "c52", "000126", "c52"), ("V2X-Seq-SPD", "s0002", "001486", "s0002"),
         ("DAIR-V2X-C", "c52", "000163", "c52"), ("V2X-Seq-SPD", "s0002", "001528", "s0002"),
-        ("DAIR-V2X-C", "c52", "000067", "c52"), ("V2X-Seq-SPD", "s0002", "001498", "s0002"),
+        ("DAIR-V2X-C", "c114", "000078", "c114"), ("V2X-Seq-SPD", "s0002", "001498", "s0002"),
         ("DAIR-V2X-C", "c105", "000096", "c105"), ("V2X-Seq-SPD", "s0054", "002324", "s0054")]
 W, H = 400, 270
 
@@ -63,5 +63,5 @@ for ds, name, lab, clip in PICK:
                            tile(m, np.array([-7.5, 8.6, 3.8]), f"length {r['length']:.1f} m (label {r['label_length']:.1f} m)")]))
     print(name, lab, r["ann_track"], round(r["fused closed: iou"], 2), flush=True)
 two = [np.hstack([rows[i], np.full((rows[i].shape[0], 16, 3), 255, np.uint8), rows[i + 1]]) for i in range(0, len(rows) - 1, 2)]
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures", os.environ.get("OUT_NAME", "best_models_new.png"))
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "figures", os.environ.get("OUT_NAME", "best_models.png"))
 cv2.imwrite(out, np.vstack(two)); print(out)

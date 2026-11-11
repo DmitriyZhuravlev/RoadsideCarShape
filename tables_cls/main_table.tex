@@ -1,6 +1,6 @@
 \begin{table}[t]
 \centering
-\caption{Car models from the video alone against their accumulated LiDAR: mean solid IoU against the gap-closed reference, on intersections A and B, three clips of DAIR-V2X-C and four sequences of V2X-Seq-SPD. The labelled box, a box of our own estimated size, the input cuboid of the classical method and the best single window are scored in the same way; the last two columns pair our models with the labelled box and with their input cuboid on the same cars (mean difference, 95\,\% bootstrap interval, 5000 resamples).}
+\caption{Car models from the video alone against their accumulated LiDAR: mean solid IoU against the gap-closed reference. The labelled box, a box of our own estimated size, the input cuboid of the classical method and the best single window are scored in the same way; the last two columns pair our models with the labelled box and with their input cuboid on the same cars (mean difference, 95\,\% bootstrap interval, 5000 resamples). Every car counts once.}
 \label{tab:main}
 \setlength{\tabcolsep}{3pt}
 \resizebox{\textwidth}{!}{%
@@ -9,10 +9,11 @@
  & cars & ours & labelled & box of & input & single & ours $-$ labelled & ours $-$ input \\
  & & & box & our size & cuboid & window & & \\
 \midrule
-A & 8 & 0.589 & 0.572 & 0.607 & 0.552 & 0.275 & $+0.017$ $[-0.071, +0.093]$ & $+0.037$ $[-0.069, +0.130]$ \\
-B & 9 & 0.507 & 0.508 & 0.484 & 0.504 & 0.401 & $-0.001$ $[-0.080, +0.058]$ & $+0.002$ $[-0.063, +0.055]$ \\
-DAIR-V2X-C & 24 & 0.584 & 0.637 & 0.615 & 0.599 & 0.223 & $-0.053$ $[-0.103, -0.003]$ & $-0.015$ $[-0.066, +0.037]$ \\
-V2X-Seq-SPD & 30 & 0.554 & 0.649 & 0.587 & 0.617 & 0.292 & $-0.095$ $[-0.158, -0.039]$ & $-0.062$ $[-0.120, -0.007]$ \\
+intersection A & 8 & 0.624 & 0.572 & 0.619 & 0.552 & 0.275 & $+0.052$ $[-0.029, +0.124]$ & $+0.072$ $[-0.018, +0.152]$ \\
+intersection B & 9 & 0.512 & 0.508 & 0.486 & 0.504 & 0.401 & $+0.004$ $[-0.068, +0.062]$ & $+0.008$ $[-0.050, +0.054]$ \\
+further clips & 34 & 0.598 & 0.647 & 0.607 & 0.615 & 0.295 & $-0.049$ $[-0.106, +0.001]$ & $-0.016$ $[-0.066, +0.030]$ \\
+\midrule
+all & 51 & 0.587 & 0.611 & 0.588 & 0.585 & 0.311 & $-0.024$ $[-0.066, +0.017]$ & $+0.002$ $[-0.036, +0.039]$ \\
 \bottomrule
 \end{tabular}}
 \end{table}
