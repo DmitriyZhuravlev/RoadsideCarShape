@@ -564,25 +564,22 @@ solid IoU against the gap-closed LiDAR and its length against the labelled lengt
 \label{fig:large}
 \end{figure}
 
-\paragraph{Pedestrians and motorcyclists.} A person or a rider is thin and partly non-rigid, and the rigid
+\paragraph{Pedestrians, cyclists and motorcyclists.} A person or a rider is thin and partly non-rigid, and the rigid
 triangulation finds almost no points on it. For these road users only the silhouettes are used, again with no learned
 step: the silhouette is the foreground against the median background, followed from frame to frame; its lowest point
 touches the road and gives the path by inverse perspective mapping, and the heading is the tangent of the smoothed
 path; the shape is the visual hull in the object's own frame, kept where a voxel and its mirror image project into
 the silhouette in 75\,\% of the frames, at most 0.6~m wide. A label serves only to pick the object in one frame. The
 carve uses every second frame; on the others the model's outline is compared with the silhouette (hold-out IoU).
-Figure~\ref{fig:vru} shows a pedestrian and a motorcyclist of V2X-Seq-SPD at 27--28~m. The models are coarse: the
+Figure~\ref{fig:vru} shows a pedestrian, a cyclist and a motorcyclist of V2X-Seq-SPD at 27--31~m. The models are coarse: the
 pedestrian comes out 1.36~m tall against the labelled 1.80~m (hold-out IoU 0.29), since the hull keeps only what
-the silhouettes of a walking person agree on; the motorcyclist 1.25~m tall and 1.52~m long against 1.18 and 1.98~m
-(hold-out IoU 0.44). Their paths are off by 0.70 and 0.41~m along the viewing ray and by about 0.2~m across it. A
-cyclist of the same sequence was not reconstructed: its silhouette is free of other objects in five frames only.
+the silhouettes of a walking person agree on; the cyclist, on intersection A, 1.39~m tall and 1.25~m long against 1.57 and 1.55~m (hold-out IoU 0.52), with the rider and the wheels recognisable; the motorcyclist 1.25~m tall and 1.52~m long against 1.18 and 1.98~m (hold-out IoU 0.44). Their paths are off by 0.70, 0.31 and 0.41~m along the viewing ray and by 0.1--0.2~m across it. A second cyclist, of sequence 0059, was not reconstructed: its silhouette is free of other objects in five frames only.
 These models are not scored against the LiDAR.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=\textwidth]{vru_compare.png}
-\caption{A pedestrian (sequence 0077) and a motorcyclist (sequence 0059) of V2X-Seq-SPD from their silhouettes
-alone. Per row: a frame of the video; the model drawn into it; the model from three viewpoints. Above each row: range,
+\caption{A pedestrian (sequence 0077), a cyclist (intersection A) and a motorcyclist (sequence 0059) of V2X-Seq-SPD from their silhouettes alone. Per row: a frame of the video; the model drawn into it; the model from three viewpoints. Above each row: range,
 number of frames, the model's height, length and width against the labelled ones, and the hold-out IoU.}
 \label{fig:vru}
 \end{figure}
@@ -641,8 +638,7 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 \item \emph{Tuning.} The parameters were chosen on intersection A with more precise masks and cuboids than the
   classical ones, and B and clips of the two datasets informed three choices (Sect.~\ref{sec:protocol}); no set is a
   clean hold-out. All intersections are in one city, the two datasets share them, and all use the same kind of camera.
-\item \emph{Other road users.} Only cars are evaluated against the LiDAR. A pedestrian and a motorcyclist are shown
-  as coarse models from their silhouettes alone, the pedestrian a quarter too low; a cyclist was not reconstructed.
+\item \emph{Other road users.} Only cars are evaluated against the LiDAR. A pedestrian, a cyclist and a motorcyclist are shown as coarse models from their silhouettes alone, the pedestrian a quarter too low; a second cyclist was not reconstructed.
 \item \emph{Run time.} The reference Python implementation needs one to two minutes per window on a single CPU core and a
   few minutes per car for the track solve; the classical input takes about 6~s per frame (the 250 frames of A in
   about 25 minutes). Neither is optimised.
