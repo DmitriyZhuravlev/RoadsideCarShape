@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{End to end from the video alone: car models reconstructed from the classical input (Sect.~\ref{sec:classical}), mean solid IoU against the gap-closed LiDAR, on intersections A and B, three clips of DAIR-V2X-C and four sequences of V2X-Seq-SPD. The labelled box, a box of our own estimated size, the input cuboid of the classical method and the best single window are scored in the same way; the last two columns pair our models with the labelled box and with their input cuboid on the same cars (mean difference, 95\,\% bootstrap interval).}
+\label{tab:e2e}
+\setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrccccccc}
+\toprule
+ & cars & ours & labelled & box of & input & single & ours $-$ labelled & ours $-$ input \\
+ & & & box & our size & cuboid & window & & \\
+\midrule
+A & 8 & 0.589 & 0.572 & 0.607 & 0.552 & 0.275 & $+0.017$ $[-0.071, +0.093]$ & $+0.037$ $[-0.069, +0.130]$ \\
+B & 9 & 0.507 & 0.508 & 0.484 & 0.504 & 0.401 & $-0.001$ $[-0.080, +0.058]$ & $+0.002$ $[-0.063, +0.055]$ \\
+DAIR-V2X-C & 24 & 0.584 & 0.637 & 0.615 & 0.599 & 0.223 & $-0.053$ $[-0.103, -0.003]$ & $-0.015$ $[-0.066, +0.037]$ \\
+V2X-Seq-SPD & 30 & 0.554 & 0.649 & 0.587 & 0.617 & 0.292 & $-0.095$ $[-0.158, -0.039]$ & $-0.062$ $[-0.120, -0.007]$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
