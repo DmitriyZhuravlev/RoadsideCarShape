@@ -2,38 +2,35 @@
 
 <p align="center"><img src="figures/turntable.gif" width="560" alt="A reconstructed car model rotating"></p>
 
-<p align="center"><i>A van reconstructed from one fixed roadside camera of DAIR-V2X-C, without learning and without
-labels (clip 106_0; solid IoU 0.79 against its LiDAR, length 4.5 m against 4.5 m labelled). The colours are the
-original pixels of the video.</i></p>
+<p align="center"><i>A car of DAIR-V2X-C (clip 114_0) reconstructed from one fixed roadside camera. The colours are
+the original pixels of the video.</i></p>
 
 Monocular 3D perception for roadside cameras is almost always a learned box detector. This work recovers the 3D
-**shape** of the cars that pass a fixed, calibrated camera with classical geometry only: in short windows of the video
-every moving car is triangulated and its planar motion and the depth of every vertex are solved jointly; over the
-whole video the windows of one car are solved together as one rigid car, mirrored about its symmetry plane, averaged
-as a robust height field and completed by a visual hull of the silhouettes; a car whose length the video never
-measured takes its body type's length and profile. LiDAR and 3D labels are used for evaluation only (labelled 2D
-boxes serve once, as the tracker of a diagnostic experiment on pedestrians).
+**shape** of the cars that pass a fixed, calibrated camera with classical geometry only. A classical method finds
+the mask and the 3D cuboid of every moving car in the video (background subtraction, optical flow, tangents from the
+vanishing points). In short windows of the video every car is then triangulated and its planar motion and the depth
+of every vertex are solved jointly; over the whole video the windows of one car are solved together as one rigid
+car, mirrored about its symmetry plane, averaged as a robust height field and completed by a visual hull of the
+masks. No step is learned; LiDAR and 3D labels are used for evaluation only.
 
-| Data (cars with LiDAR) | ours, closed LiDAR | labelled box | ours, raw LiDAR | labelled box |
+| Data (cars scored) | ours | labelled box | input cuboid | best single window |
 | :--- | :---: | :---: | :---: | :---: |
-| V2X-Seq-SPD example, intersection A (19 tracks of 18 cars; tuning) | 0.617 | 0.572 | 0.403 | 0.376 |
-| DAIR-V2X-C example, intersection B (7) | 0.571 | 0.546 | 0.404 | 0.378 |
-| DAIR-V2X-C, 20 clips, 7 intersections (109) | 0.612 | 0.618 | 0.463 | 0.465 |
-| V2X-Seq-SPD, 12 sequences, 6 intersections (104) | 0.618 | 0.636 | 0.450 | 0.488 |
+| V2X-Seq-SPD example, intersection A (8; tuning) | 0.589 | 0.572 | 0.552 | 0.275 |
+| DAIR-V2X-C example, intersection B (9) | 0.507 | 0.508 | 0.504 | 0.401 |
+| DAIR-V2X-C, 3 clips (24) | 0.584 | 0.637 | 0.599 | 0.223 |
+| V2X-Seq-SPD, 4 sequences (30) | 0.554 | 0.649 | 0.617 | 0.292 |
 
-Mean solid IoU of the height fields against the cars' accumulated LiDAR (raw, and with the gaps between scan lines
-closed), the labelled boxes scored the same way on the same cars. On the two larger evaluations the paired difference
-to the labelled boxes is not separated from zero (-0.006 [-0.025, +0.012] and -0.018 [-0.041, +0.004], 95 %
-bootstrap intervals), also on the clips that informed no design choice (+0.001 [-0.021, +0.022] on 71 and
--0.017 [-0.042, +0.009] on 94 cars); B and five of the clips informed three choices. The reference is the
-accumulated LiDAR completed by its mirror image. The main remaining errors are the position along the viewing ray and the coverage: about half
-of the visible moving cars get a model. Nearby pedestrians and cyclists are reconstructed from their silhouettes
-alone (coarse models; they need a good tracker).
+Mean solid IoU of the height fields against the cars' accumulated LiDAR with the gaps between scan lines closed; the
+labelled boxes, the input cuboids of the classical method and the best single window are scored the same way on the
+same cars. The models are level with the labelled boxes on A and B (paired difference +0.017 [-0.071, +0.093] and
+-0.001 [-0.080, +0.058], 95 % bootstrap intervals) and below them on the further clips (-0.053 [-0.103, -0.003] and
+-0.095 [-0.158, -0.039]); they do not yet improve on their own input cuboids. The main limits are the classical
+masks and cuboids and the coverage: 8 of the 24 cars of A with a LiDAR reference get a model.
 
 ## Contents
 
 - `main.tex` - the article (LNCS), `springer/` - the version for EURASIP Journal on Image and Video Processing
-  (Springer Nature template, `scripts/make_springer.py`), `references.bib`, `figures/`, `tables/`.
+  (Springer Nature template, `scripts/make_springer.py`), `references.bib`, `figures/`, `tables/`, `tables_cls/`.
 - `code/` - a snapshot of the pipeline (from the research repository 3dseg), with its README.
 - `scripts/` - tables and figures of the article from the results of the code.
 
@@ -42,22 +39,15 @@ in `springer/`.
 
 ## Reproducing the tables and figures
 
-The numbers come from 3dseg commit `85785c2`; the same code is in `code/`.
-
-- Tables: `scripts/make_tables.py` (do not edit `tables/*.tex` by hand; `tables/compare.tex` is written by hand) and
-  `scripts/paired_ci.py` (`tables/paired_ci.tex`).
-  - Ablation and intersections A, B: `scripts/rerun_ablation.py` runs the six steps on both intersections (A: the
-    V2X-Seq-SPD example; B: the DAIR-V2X-C example converted by `code/coop_to_spd.py`), with the windows of the current
-    code (`whole_scene.py` with `DUMP=1`); `scripts/box_scores.py` scores the labelled box and a box of our own size
-    on the same cars.
-  - Larger evaluation: `code/experiments/run_subset.py` makes the windows of every clip (DAIR-V2X-C converted by
-    `coop_to_spd.py --clips`, V2X-Seq-SPD split by `spd_split.py`); `whole_scene_cars.py` per clip writes
-    `docs/whole_scene_cars_all_<clip>.json`; `pool.py` scores the labelled boxes (`boxes.json`).
-- Figures of intersection A: `scripts/capture_models.py` (with `DUMPS=docs/ba_objects/A`) keeps the models with their
-  poses in `figures/models_A.pkl` (large, regenerable, not in git); then `cars_figure.py` (`cars_best.png`),
-  `scene_figure.py` (`scene_models.jpg`), `method_figure.py 003976 003985 003890` (`method_steps.png`, with
-  `DUMPS=docs/ann_objects_Aall1`), `lidar_reference_figure.py` (`lidar_reference.png`).
-- `figures/best_models.png` (the best models of all datasets with their video frames) and `figures/vru_compare.png`
-  (pedestrians and cyclists with our own and with the labelled 2D boxes as tracking): `scripts/best_models_figure.py`
-  and `scripts/vru_compare_figure.py`; `figures/turntable.gif`: `scripts/gif_variants.py`.
-- Copied from the 3dseg outputs: `window.jpg`.
+- Tables of the article: `scripts/make_tables_cls.py` writes `tables_cls/main_table.tex`, `tables_cls/clips_table.tex`
+  and `tables_cls/numbers.tex` from the per-clip results of the research repository 3dseg
+  (`docs/whole_scene_cars_ann_<run>_<tag>.json`); do not edit them by hand. `tables/classical_input.tex` and
+  `tables/compare.tex` are also used by the article.
+- Figures of the article, all from the classical input: `scripts/teaser_figure.py` (`teaser.png`),
+  `scripts/heading_figure.py` (`heading.png`), `scripts/method_figure.py` (`method_steps.png`),
+  `scripts/cars_figure.py` (`cars_best.png`), `scripts/best_models_classical.py` (`best_models.png`),
+  `scripts/lidar_reference_figure.py` (`lidar_reference.png`). The figures of intersection A need the captured models
+  `figures/models_A_cls.pkl` (large, regenerable, not in git).
+- Not used by the article any more: the other files of `tables/`, the figures `*_SLAM.png` and `vru_compare.png`, and
+  their scripts (`make_tables.py`, `paired_ci.py`, `rerun_ablation.py`, `best_models_figure.py`,
+  `vru_compare_figure.py`) belong to earlier experiments with masks and cuboids derived from the labels and LiDAR.
