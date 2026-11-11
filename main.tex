@@ -13,8 +13,7 @@
 \usepackage[hidelinks]{hyperref}
 
 \graphicspath{{figures/}}
-\input{tables/numbers.tex}
-\input{tables/numbers_large.tex}
+
 \input{tables_cls/numbers.tex}
 
 \newcommand{\R}{\mathbb{R}}
@@ -35,17 +34,16 @@
 Roadside cameras watch the same intersection for years, yet monocular 3D perception for them is almost always a
 learned detector that outputs boxes and needs thousands of labelled 3D boxes from the same kind of camera. We present
 a learning-free 3D triangulation of the objects that move past a fixed, calibrated, elevated camera. Its input is a
-mask and a 3D cuboid of every moving object per frame, from any source; we describe a classical method that obtains them from the video, and evaluate the reconstruction on precise masks and cuboids derived from the datasets' labels and LiDAR and, end to end, on the classical ones. In short windows
+mask and a 3D cuboid of every moving object per frame; a classical method obtains them from the video alone, so that no step of the chain is learned. In short windows
 of the video the masked surface is triangulated, and its planar rigid motion and the depth of every vertex are solved
 jointly, with the scale fixed by the cuboid. All windows of an object are then solved together as one rigid body,
 mirrored about its symmetry plane, averaged as a robust height field and completed by a visual hull of the masks: the
-elevated camera sees the roof and one side, and the rest comes from the symmetry and the cuboid. With the precise input, against the cars'
-accumulated LiDAR, mirrored and with the gaps between scan lines closed, the car models reach a mean solid IoU of \AsixClosed{} on the tuning
-intersection (labelled boxes: \AlabClosed{}) and
-\BsixClosed{} on a second intersection (\BlabClosed{}); unchanged, they reach
-\DairOursClosed{} on \DairCars{} cars of DAIR-V2X-C and \SpdOursClosed{} on \SpdCars{} cars of V2X-Seq-SPD
-(labelled boxes: \DairBoxClosed{} and \SpdBoxClosed{}). End to end from the video alone they reach \ClsAOurs{} and \ClsBOurs{} on the two intersections, level with the labelled boxes (\ClsALab{} and \ClsBLab{}), and fall below the boxes on further clips: there the input, not the reconstruction, limits the result. Pedestrians and cyclists are reconstructed by the same
-steps.
+elevated camera sees the roof and one side, and the rest comes from the symmetry and the cuboid. Against the cars' accumulated LiDAR, mirrored and with the gaps between scan lines closed, the car models reach a
+mean solid IoU of \ClsAOurs{} on the tuning intersection (labelled boxes: \ClsALab{}) and \ClsBOurs{} on a second
+intersection (\ClsBLab{}), far above the best single window (\ClsASingle{} and \ClsBSingle{}); on \ClsDCars{} cars of
+DAIR-V2X-C and \ClsSCars{} cars of V2X-Seq-SPD they reach \ClsDOurs{} and \ClsSOurs{} (labelled boxes: \ClsDLab{}
+and \ClsSLab{}). From the video alone the models are thus level with labelled 3D boxes on the two intersections and
+below them on the further clips, and the quality of the classical masks and cuboids limits the result.
 \keywords{3D reconstruction \and vehicle shape \and roadside camera \and visual hull \and structure from motion \and
 monocular vision \and learning-free}
 \end{abstract}
@@ -103,9 +101,9 @@ that make it possible here are:
   symmetry plane, into a weighted-median height field: triangulated where the car is textured, the corrected hull
   where it is not (Sects.~\ref{sec:fusion}--\ref{sec:completion});
 \item \emph{an unbiased LiDAR reference}: the raw accumulated LiDAR is strongly biased at long range (the labelled box
-  itself scores \AlabRaw{} against it), and a gap-closed reference is proposed; against it and with precise input, on 237 cars at seven
-  intersections, the shapes reach a higher solid IoU than the labelled boxes on all four sets
-  (Sects.~\ref{sec:protocol}--\ref{sec:results}); end to end from the video alone they are level with the boxes on the two development intersections and below them elsewhere (Table~\ref{tab:e2e}).
+  itself scores \ClsALabRaw{} against it), and a gap-closed reference is proposed; against it, on \ClsTotalCars{} cars
+  of two datasets and from the video alone, the shapes are level with the labelled boxes on the two development
+  intersections and below them on the other clips (Sects.~\ref{sec:protocol}--\ref{sec:results}).
 \end{enumerate}
 
 % ------------------------------------------------------------------------------------------------------------------
@@ -184,7 +182,7 @@ cuboid (Sect.~\ref{sec:completion}, Fig.~\ref{fig:steps}). Section~\ref{sec:syst
   \end{scope}
 \end{tikzpicture}}
 \caption{The pipeline. Every window of up to $\pm 8$ frames is reconstructed on its own (blue); the windows of one object
-are then fused over all frames that see it (orange). No step of the reconstruction is learned; its input, the masks and cuboids, can be.}
+are then fused over all frames that see it (orange). No step is learned.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -192,10 +190,8 @@ are then fused over all frames that see it (orange). No step of the reconstructi
 
 For every moving object the method takes its mask and its 3D cuboid (centre on the road, heading, length, width and
 height) in the frames that see it, linked into tracks. Any source can supply them: the classical method of
-Sect.~\ref{sec:classical}, or learned detectors and segmenters where better input is needed. In the experiments of
-Sects.~\ref{sec:protocol}--\ref{sec:results} the masks were segmented inside the labelled 2D boxes (by SAM~2
-\cite{sam2} for the cars), the cuboids fitted to each object's LiDAR points (the labelled cuboid where there were too
-few), and the tracks taken from the label identities. SAM~2 is a learned segmenter and the cuboids use the LiDAR: this input is deliberately precise, so that the shape results measure the reconstruction alone, i.e.\ what the reconstructed shape adds to a box of the same size and position, and not the errors of a detector. The classical input is evaluated on its own, as a detector (Table~\ref{tab:classical}), and the shapes reconstructed from it end to end are scored separately (Table~\ref{tab:e2e}).
+Sect.~\ref{sec:classical}, or learned detectors and segmenters where better input is needed. All experiments of Sects.~\ref{sec:protocol}--\ref{sec:results} use the classical method; the labels of the
+datasets serve only to pair a model with its LiDAR reference.
 
 A window is built at every frame in which the object is neither occluded nor
 cut by the image border. The method uses the cuboid's position and size; its heading serves
@@ -254,7 +250,7 @@ an object of the track gets its prediction.
 \subsection{Triangulation of one window}\label{sec:window}
 
 \paragraph{The surface and its mesh.} The mask of the reference frame, slightly eroded so that no vertex lies on its
-outline, receives a regular grid of vertices, triangulated by Delaunay. The window is at most $\pm 8$ frames around the reference frame; for a fast or near object it is shortened to the frames in which the object moves at most 100~px in the image from the reference, but not below $\pm 3$ frames (a longer window of 200~px did not change the shapes). Every vertex is tracked through the window with pyramidal Lucas--Kanade \cite{lucas_kanade} and a forward--backward check, and kept if it is
+outline, receives a regular grid of vertices, triangulated by Delaunay. The window is at most $\pm 8$ frames around the reference frame; for a fast or near object it is shortened to the frames in which the object moves at most 100~px in the image from the reference, but not below $\pm 3$ frames . Every vertex is tracked through the window with pyramidal Lucas--Kanade \cite{lucas_kanade} and a forward--backward check, and kept if it is
 followed in most of them.
 
 \paragraph{Joint solve.} The unknowns are the motion $\vect{m}_j = (\theta_j, \vect{t}_j)$ of the car in every frame
@@ -300,7 +296,7 @@ cuboid fixes where the object is and how large; its shape still comes from the t
 \includegraphics[width=\textwidth]{heading.png}
 \caption{Orientation from motion, intersection A. (a) The path of every car and its heading from the track solve
 (blue arrows), with the labelled cuboids (grey, evaluation only); (b) a turning car up close. The
-heading follows the direction of travel through the turn; median error against the labelled yaw $3.2^\circ$ over the 8 cars of A reconstructed from the classical input.}
+heading follows the direction of travel through the turn; median error against the labelled yaw $\ClsAHeading^\circ$ over the \ClsACars{} cars of A.}
 \label{fig:heading}
 \end{figure}
 
@@ -321,7 +317,7 @@ Eq.~(\ref{eq:track}) keeps it along the direction of travel.
 bounding box is aligned with the heading: its length and width are the extents of the occupied height-field columns
 along $x$ and $y$, its height a high percentile of the column heights. A car that turns is therefore boxed along its
 momentary direction of travel. Figure~\ref{fig:heading} shows the paths and headings of the cars of A; the heading
-errors of all datasets are given in Sect.~\ref{sec:results}.
+errors of all sets are given in Sect.~\ref{sec:results}.
 
 \subsection{One rigid body per track}\label{sec:fusion}
 
@@ -380,7 +376,7 @@ thin. A median filter and the largest connected component finish the field.
 \paragraph{Cabin from the masks.} The triangulated field covers the textured surface; the glass and the roof are often too
 dark or too uniform to track. The silhouette of the object in every frame is its mask; the masks of the frames in
 which the object is unoccluded and inside the image carve. Voxels are kept if they, and their mirror images, project
-inside the mask in at least 75\,\% of the frames that see them (a visual hull \cite{laurentini} with a soft vote: the masks and poses are not exact, and a strict vote of 95\,\% cuts away volume and lowers the IoU on A by 0.01); the top of the kept voxels is
+inside the mask in at least 75\,\% of the frames that see them (a visual hull \cite{laurentini} with a soft vote: the masks and poses are not exact); the top of the kept voxels is
 the cabin field, and the model is the higher of the triangulated and cabin fields. A high camera sees a car from
 nearly the same direction in all frames, so the cone of one silhouette is long along the viewing ray and rises toward
 the camera; the hull is therefore capped a little above the cuboid's height. For near objects the silhouettes alone
@@ -400,15 +396,14 @@ the car.
 scale-free features (length to height, share of the length under the roof, height of the front and rear) and a type
 by fixed rules: sedan, hatchback, SUV or van. For a car seen from the side the width lies nearly along the viewing
 ray, where a single camera measures it worst; the width is therefore bounded about the symmetry plane by the type's
-typical width with its mirrors, which the LiDAR sees and a cuboid fitted to the body leaves out. The cabin is narrower than the body, and its near upper edge is never seen against the background; across the car the field is therefore capped by a fixed profile, a roof over 72\,\% of the width and sides that lean inward above the belt line at 62\,\% of the height. Without this taper the IoU falls by 0.002 on A and 0.024 on B.
+typical width with its mirrors, which the LiDAR sees and a cuboid fitted to the body leaves out. The cabin is narrower than the body, and its near upper edge is never seen against the background; across the car the field is therefore capped by a fixed profile, a roof over 72\,\% of the width and sides that lean inward above the belt line at 62\,\% of the height. 
 
 \paragraph{Length.} The length is measured only where the car is seen side-on, i.e.\ where the viewing ray crosses the car at a large angle. A car seen
 side-on in fewer than two windows --- most often a car seen only from behind --- has a length and a profile the video
 never measured, only a silhouette cone that is long along the ray. It is completed from its cuboid: the footprint of
 the cuboid's length and width about the middle of the cone and the symmetry plane, and the profile of its body type
 scaled to the cuboid's height, a box up to the shoulder line and a cabin box on top with a sloping windshield and rear
-window. This is completion, not measurement, and we report the two groups of cars separately
-(Sect.~\ref{sec:results}). Cars measured side-on, vans included, keep their own length and shape.
+window. This is completion, not measurement. Cars measured side-on, vans included, keep their own length and shape.
 
 \paragraph{Surface.} The height field is regularised between its raw surface and a convex hull: every
 cross-section of the car becomes its upper concave envelope, which fills notches and holes in the roof, while along
@@ -449,7 +444,7 @@ For one object, with masks $M_g$ and cuboids $B_g$ in its frames $g$, the method
   width.
 \end{enumerate}
 Steps 1 and 4 are non-linear least squares; every residual enters through the soft-$\ell_1$ loss, and they are solved
-by a trust-region method with bounds and a sparse finite-difference Jacobian, stopped after a fixed number of evaluations (60 for a window, 40 for a track; 200 for a track did not improve the shapes). Steps 2, 3 and 5 are closed-form or a one-dimensional
+by a trust-region method with bounds and a sparse finite-difference Jacobian, stopped after a fixed number of evaluations (60 for a window, 40 for a track). Steps 2, 3 and 5 are closed-form or a one-dimensional
 search. The weights and thresholds were set once on intersection A and are the same for every object and dataset.
 
 % ------------------------------------------------------------------------------------------------------------------
@@ -458,13 +453,13 @@ search. The weights and thresholds were set once on intersection A and are the s
 \paragraph{Datasets.} \emph{Intersection A} is the infrastructure side of the V2X-Seq-SPD example \cite{v2xseq}
 (sequence 0058, 251 frames at 10~Hz, $1920 \times 1080$, camera 8.45~m above the road and tilted $15^\circ$ down,
 wet road). \emph{Intersection B} is the infrastructure side of the DAIR-V2X-C example \cite{dairv2x} (84 frames at
-12.5~Hz, camera 8.96~m above the road, dry road); its labels have no track identities, so we link the labelled boxes from frame to frame.
+12.5~Hz, camera 8.96~m above the road, dry road); its labels have no track identities, so we link the labelled boxes from frame to frame. Three further clips of DAIR-V2X-C (114, 105 and 52) and four further sequences of V2X-Seq-SPD (0002, 0054, 0059 and 0077) complete the evaluation; frames missing from a recording are skipped and the motion is measured per time slot.
 
-\paragraph{Tuning.} The parameters were chosen on intersection A. Three design choices also looked at B and at five
-clips of the larger evaluation (Sect.~\ref{sec:results}): the length cap only for cars never seen side-on, rather than
-for every car (chosen on A, B and the five clips); the soft hull vote (Sect.~\ref{sec:completion}; chosen on A and B); and the joint solve of a track (adopted after it improved A, B and one of the five clips). Ideas
-that did not help on A and B were dropped. B is therefore not a clean hold-out; for the larger evaluation we also report the clips that
-informed no choice.
+\paragraph{Tuning.} The parameters of the reconstruction were chosen on intersection A, during development and with
+masks and cuboids more precise than the classical ones, derived from the labels and the LiDAR. Three design choices
+also looked at B and at clips of the two datasets: the length cap only for cars never seen side-on, rather than for
+every car; the soft hull vote (Sect.~\ref{sec:completion}); and the joint solve of a track. Every result reported
+here uses the classical input with no parameter changed, but no set is a clean hold-out of the design.
 
 \paragraph{LiDAR reference.} For each labelled car the LiDAR points inside its box are collected over its whole track
 in the box frame, mirrored about the box's vertical centre plane along its heading and turned into a height field of
@@ -474,10 +469,10 @@ evaluated when its reference holds enough points and one of our tracks is matche
 
 \paragraph{The reference is biased.} At 60~m a LiDAR scan is sparse: the accumulated points leave gaps between scan
 lines on the roof and the bonnet, and these gaps are counted as empty space. Scored against the raw field, the
-\emph{labelled box itself} reaches a mean solid IoU of only \AlabRaw{} on intersection A --- about what our models
+\emph{labelled box itself} reaches a mean solid IoU of only \ClsALabRaw{} on intersection A --- about what our models
 score --- so the raw reference cannot rank methods near the top. We close the gaps by a grey-scale closing of the
 height field with a radius of 15~cm, which fills gaps between returns but does not extend the outline; against the
-gap-closed field the labelled box scores \AlabClosed{} on A and \BlabClosed{} on B. We report both references.
+gap-closed field the labelled box scores \ClsALab{} on A and \ClsBLab{} on B. We report both references.
 Figure~\ref{fig:lidar} shows the effect for two cars.
 
 \begin{figure}[t]
@@ -501,126 +496,75 @@ differences between our models and the labelled boxes on the same cars are given
 % ------------------------------------------------------------------------------------------------------------------
 \section{Results}\label{sec:results}
 
-\input{tables/main_table.tex}
+\input{tables_cls/main_table.tex}
 
-\paragraph{Intersection A (tuning set).} Table~\ref{tab:main} compares the models with three references scored in
-the same way: the labelled box, a box of our own estimated length, width and height, and the best single window
-without averaging and symmetry. All \Acars{} moving cars of A with a LiDAR reference are scored; a car is paired
-with its label over its whole track. A is the tuning set, so this comparison is in-sample. Against the gap-closed reference our models reach
-\AsixClosed{}, above the labelled boxes (\AlabClosed{}) and above a box of the same size as ours (\AboxClosed{}): the
-shape adds to the dimensions. The cuboids that the method was given as input, scored in the same way, reach 0.567 on A and 0.556 on B: the models are ahead of their own input by 0.078 [0.052, 0.103] on A (22 of 24 cars) and 0.081 [0.065, 0.097] on B (15 of 15). A single window reaches only \AsingleClosed{}; the gain comes from fusing the video
-(Fig.~\ref{fig:steps}).
+\paragraph{Intersection A (tuning set).} Table~\ref{tab:main} compares the models with four references scored in
+the same way: the labelled box, a box of our own estimated length, width and height, the cuboid the classical method
+gave as input, and the best single window without averaging and symmetry. A car is paired with its label over its
+whole track. Of the 24 moving cars of A with a LiDAR reference, \ClsACars{} get a model: the classical input misses
+or merges the others (Table~\ref{tab:classical}). Against the gap-closed reference the models reach \ClsAOurs{},
+against \ClsALab{} for the labelled boxes and \ClsAInput{} for their input cuboids; with \ClsACars{} cars the
+intervals of both differences include zero. A box of the models' own size scores \ClsAOwn{}
+(ours minus that box: \ClsADOwn{}): on A the shape does not add to its dimensions. Against the raw reference the
+models reach \ClsAOursRaw{} and the labelled boxes \ClsALabRaw{}. A single window reaches only \ClsASingle{}
+(\ClsADSingle{}); the gain comes from fusing the video (Fig.~\ref{fig:steps}). The length is off by a mean of
+\ClsALerr{}~m, the width by \ClsAWerr{}~m and the height by \ClsAHerr{}~m against the labelled box, and the height
+field by \ClsAFieldErr{}~cm against the LiDAR. About a third of the occupied columns of the gap-closed reference were
+added by the closing itself (mean filled share \ClsAFilled{} on A); scored on all columns except that invented
+volume, the pair barely changes: a scanned IoU of \ClsAScanned{} against \ClsALabScanned{} for the labelled box.
+Figure~\ref{fig:cars} shows four of the models up close, drawn into their frames, with their LiDAR.
 
-\paragraph{Intersection B.} The same method reaches \BsixClosed{} against \BlabClosed{} for the
-labelled boxes (Table~\ref{tab:main}). B is harder than A: all \Bcars{} cars drive away from the camera and are seen
-only from behind. The textured part is then the rear, whose depth is measured along the viewing ray, and the
-silhouette cone is long in the same direction. No window of them is side-on, so their length comes from the cuboid,
-and their roof from the far edge of the masks. With both, our models are ahead of the labelled boxes on every car of B
-(Table~\ref{tab:paired}: $+0.107$ $[+0.086, +0.129]$), with a height error of 11~cm. Their position along the ray is
-off by \Balong{}~m, which is the clock offset between camera and LiDAR, not the method: with that offset fitted, it
-is 0.48~m (see \emph{Position} below).
+\paragraph{Intersection B.} The same method reaches \ClsBOurs{} against \ClsBLab{} for the labelled boxes and
+\ClsBInput{} for the input cuboids (Table~\ref{tab:main}), for \ClsBCars{} of the 15 cars with a LiDAR reference. B
+is harder than A: all cars drive away from the camera and are seen only from behind. The textured part is then the
+rear, whose depth is measured along the viewing ray, and the silhouette cone is long in the same direction. No
+window of them is side-on, so their length comes from the cuboid, and their roof from the far edge of the masks. The
+models are ahead of a box of their own size, within the interval (\ClsBDOwn{}), and the height field is off by
+\ClsBFieldErr{}~cm.
 
-\input{tables/paired_ci.tex}
+\input{tables_cls/clips_table.tex}
 
-\paragraph{Paired comparison.} Table~\ref{tab:paired} pairs every car with its labelled box and bootstraps the
-mean difference; a car is \emph{measured} when at least two of its windows saw its length side-on, \emph{completed}
-when none did (Sect.~\ref{sec:completion}), and the \emph{held-out} rows leave out the five clips that informed a
-choice during development. Our models are ahead of the box with the interval clear of zero on all four sets: on both
-intersections ($+0.100$ on A, $+0.107$ on B), on the \DairCars{} cars of DAIR-V2X-C ($+0.064$ $[+0.043, +0.083]$)
-and on the \SpdCars{} cars of V2X-Seq-SPD ($+0.026$ $[+0.005, +0.046]$), also on the clips that informed no choice
-($+0.057$ $[+0.026, +0.084]$, 61 cars, and $+0.026$ $[+0.004, +0.045]$, 92 cars). The margin is smallest on
-V2X-Seq-SPD, where the slow cars of its busiest intersection come out too long
-(Sect.~\ref{sec:limits}). The cars completed from their cuboid gain about as much as the measured ones; on V2X-Seq-SPD, with 30 such
-cars, their interval includes zero. About a third of the
-occupied columns of the gap-closed reference were added by the closing itself (mean filled share 0.37 on A); scored
-on all columns except that invented volume, where a model sticking out of the car still counts, the pair barely
-changes: on A our models reach a scanned IoU of \Ascanned{} against \AlabScanned{} for the labelled box.
+\paragraph{Further clips of the two datasets.} Unchanged, the chain was run on three clips of DAIR-V2X-C and four
+sequences of V2X-Seq-SPD (Table~\ref{tab:clips}). The \ClsDCars{} cars of DAIR-V2X-C reach \ClsDOurs{} against
+\ClsDLab{} for the labelled boxes, the \ClsSCars{} cars of V2X-Seq-SPD \ClsSOurs{} against \ClsSLab{}: the models
+are below the labelled boxes on both (\ClsDDLab{} and \ClsSDLab{}). Against their own input cuboids they are level
+on DAIR-V2X-C (\ClsDDInput{}) and below on V2X-Seq-SPD (\ClsSDInput{}). They are ahead of the labelled box in two
+of the seven clips, 114 and 0077, with four and two cars; the largest deficits are in clip 52 and sequence 0002,
+the two with the most scored cars. Figure~\ref{fig:large} shows eight car models of both datasets
+next to the cars in the video.
 
-\paragraph{Position.} The shapes are compared in the car's own frame; its position is compared with the label. On A
-the car's centre is off by a median of \Aalong{}~m along the viewing ray and \Aacross{}~m across it, on the larger
-evaluation by \DairAlong{}~m and \SpdAlong{}~m along the ray (Table~\ref{tab:large}). On B it is off by \Balong{}~m
-along the ray, but there the camera and the LiDAR of the dataset are not synchronised: the model stands at the
-camera's time, the label at the LiDAR's, and a car at traffic speed travels several metres between the two clocks,
-along the direction of travel, which on B is the viewing ray. One time offset fitted to the paths of all cars of B
-($-2.25$ frames, 0.18~s; evaluation only) brings the median distance from model to label from 3.14 to 0.54~m and the
-error along the ray from \Balong{} to 0.48~m. The same clock offset, on single clips of the larger
-evaluation, put some fast cars more than 3~m from their label; a car is therefore paired with its label over its
-whole track, not by its position in a single frame. The heading from the
-motion is accurate: against the labelled yaw (modulo $180^\circ$, per car the median over its windows) the median
-error is $4.6^\circ$ on A and $1.6^\circ$ on B, $3.3^\circ$ and $2.4^\circ$ on the cars of DAIR-V2X-C and
+\paragraph{Position and heading.} The shapes are compared in the car's own frame; its position is compared with the
+label. On A the car's centre is off by a median of \ClsAAlong{}~m along the viewing ray and \ClsAAcross{}~m across
+it, on the clips of DAIR-V2X-C and V2X-Seq-SPD by \ClsDAlong{}~m and \ClsSAlong{}~m along the ray. On B it is off
+by \ClsBAlong{}~m along the ray; there the camera and the LiDAR of the dataset are not synchronised: the model
+stands at the camera's time, the label at the LiDAR's, and a car at traffic speed travels a few metres between the
+two clocks, along the direction of travel, which on B is the viewing ray. A car is therefore paired with its label
+over its whole track, not by its position in a single frame. The heading from the motion is accurate: against the
+labelled yaw (modulo $180^\circ$, per car the median over its windows) the median error is \ClsAHeading$^\circ$ on A
+and \ClsBHeading$^\circ$ on B, \ClsDHeading$^\circ$ and \ClsSHeading$^\circ$ on the cars of DAIR-V2X-C and
 V2X-Seq-SPD.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{cars_best.png}
-\caption{Four cars of intersection A reconstructed end to end from the classical input: a van, a hatchback and two sedans, each shown in a frame where it is unoccluded. Left to right: the video; our model drawn into the same frame; the model from a
+\caption{Four cars of intersection A: a van, a hatchback and two sedans, each shown in a frame where it is
+unoccluded. Left to right: the video; our model drawn into the same frame; the model from a
 new viewpoint, with the colours of the video pixels; the model with the car's accumulated LiDAR (red, evaluation
 only) and the solid IoU against it.}
 \label{fig:cars}
 \end{figure}
-\input{tables/ablation.tex}
-
-\paragraph{Ablation.} Table~\ref{tab:ablation} leaves out one part of the method at a time, on the same windows; the
-pipeline is deterministic, and repeated runs, with the track solves recomputed from scratch, give identical numbers.
-The cabin carved from the masks carries the method: without it the height field keeps whatever the depth of the
-windows puts above the car, and the IoU falls to 0.348 on A and 0.437 on B, with height errors of 54 and 33~cm.
-Solving the windows of a car together, as one rigid body, gains $+0.021$ on A and $+0.007$ on B and lowers the length
-error on A from 0.38 to 0.28~m; the symmetry gains $+0.007$ and $+0.008$. The roof from the far edge of the masks and
-the completion of end-on cars from their cuboid apply to the cars never seen side-on: on B, where every car is,
-they gain $+0.022$ and $+0.053$ (height error 20.0 to 11.3~cm); on A, where 22 of the 24 cars are seen side-on, the
-roof changes nothing and the completion costs $0.003$. Applied to every car, the roof cap lowered the side-on cars of A
-by 0.10~m against their LiDAR (Sect.~\ref{sec:completion}). Filling the unseen part of every car with its cuboid
-instead of the masks' carve, placing every window by its cuboid instead of the rigid solve, and bounding the width by
-the cuboid's all scored lower on A, and we dropped them.
-
-\input{tables/large_eval.tex}
-
-\paragraph{Two datasets, seven intersections.} To test the method beyond the two clips it was developed on,
-we ran it unchanged on \DairClips{} clips of DAIR-V2X-C (\DairFrames{} frames at \DairSites{} intersections) and on
-\SpdClips{} sequences of the full V2X-Seq-SPD (\SpdFrames{} frames at \SpdSites{} intersections), two or three of the
-longest per intersection, without the clip of intersection A. The two datasets were recorded at the same intersections
-of one city: the six intersections of V2X-Seq-SPD are among the seven of DAIR-V2X-C (Table~\ref{tab:large}), seen at
-other times, so the larger evaluation covers seven distinct intersections, and intersections A and B may be among
-them. Frames missing from the recording are skipped and the motion is
-measured per time slot. Table~\ref{tab:large} scores every car with a LiDAR reference and a labelled box against both
-references. On DAIR-V2X-C the \DairCars{} cars reach \DairOursClosed{} against \DairBoxClosed{} for the labelled boxes
-on the gap-closed reference and \DairOursRaw{} against \DairBoxRaw{} on the raw one; on V2X-Seq-SPD the \SpdCars{} cars
-reach \SpdOursClosed{} against \SpdBoxClosed{} (\SpdOursRaw{} against \SpdBoxRaw{} raw). Against the gap-closed reference
-our models are ahead at every intersection of both datasets, by the smallest margin at the busiest one of
-V2X-Seq-SPD (yz06), where many cars creep through the intersection and come out too long (Sect.~\ref{sec:limits});
-against the raw reference the labelled box is marginally ahead at three intersections of V2X-Seq-SPD. Of the 224 cars of these clips with a
-LiDAR reference, 198 are scored; the other 26 are occluded or cut by the image border in too many frames to have
-the five windows a model needs. Figure~\ref{fig:large} shows eight car models of both datasets next to the cars in the video, these reconstructed from the classical input (Table~\ref{tab:e2e}).
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=\textwidth]{best_models.png}
-\caption{Eight car models of both datasets, reconstructed end to end from the classical input. Per car: a video frame of the car; the model with the original pixels of its best views from the front left and from the rear left; its
+\caption{Eight car models of both datasets. Per car: a video frame of the car; the model with the original pixels
+of its best views from the front left and from the rear left; its
 solid IoU against the gap-closed LiDAR and its length against the labelled length.}
 \label{fig:large}
 \end{figure}
 
-\paragraph{Pedestrians, cyclists and motorcyclists.} The method assumes only that the object is roughly
-mirror-symmetric, so its steps apply to the other road users; we show it on examples of V2X-Seq-SPD. A person or a cyclist is thin and partly non-rigid: the swinging legs and arms, and the pedalling legs, fail
-the rigid triangulation. A bicycle and its rider's body are rigid enough for it: the carve of the masks, mirrored
-about the centre plane, is bounded along the line of sight by the surface triangulated over the whole pass. A walking
-person gives almost no rigid points, and the model is the symmetric carve of the masks alone. Fig.~\ref{fig:vru}
-shows a pedestrian, a cyclist and a motorcyclist: the cyclist reaches a solid IoU of 0.67 against its accumulated
-LiDAR, the motorcyclist, seen from behind, 0.73, and the pedestrian 0.57 (a second one 0.41), at the right height.
-Seen from the side, a person cannot be narrowed along the line of sight by the masks, and the pedestrians come out
-somewhat deeper across their walk than the LiDAR box. A second cyclist reaches 0.69, though its mask takes in the
-courier box of the scooter beside it; a pedestrian under an umbrella fails (0.22), as the umbrella hides the upper
-body in every frame.
-
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=\textwidth]{vru_compare.png}
-\caption{A pedestrian, a cyclist and a motorcyclist of V2X-Seq-SPD. Per row: a frame of the video; the object's mask; its cuboid; the model as the camera saw it and turned by
-90$^\circ$. Pedestrian and motorcyclist (seen from behind): the symmetric carve of the masks; cyclist: the carve
-bounded by its triangulated surface. Below each row: the solid IoU against the object's accumulated LiDAR and the
-size of the model and of the LiDAR box.}
-\label{fig:vru}
-\end{figure}
+\paragraph{What limits the result.} Every window is scaled by its cuboid and the cabin is carved from the masks
+(Sects.~\ref{sec:window} and~\ref{sec:completion}), so the errors of either go directly into the model. The input cuboids themselves score below the labelled boxes in eight of the nine clips (Table~\ref{tab:clips}), and the models are below their input cuboids in clip 52 and in sequences 0054 and 0002: there the fusion loses against its own input.
 
 \paragraph{The classical input.} Table~\ref{tab:classical} evaluates the classical input of
 Sect.~\ref{sec:classical} on all frames of intersections A and B. Of the moving road users within 80~m it finds
@@ -632,27 +576,6 @@ vehicles.
 
 \input{tables/classical_input.tex}
 
-\input{tables_cls/e2e_table.tex}
-
-\paragraph{End to end from the video alone.} Table~\ref{tab:e2e} runs the whole chain without any learned or
-LiDAR-based input: the masks, cuboids and tracks of Sect.~\ref{sec:classical} go into the unchanged reconstruction,
-and the labels serve only to pair a model with its LiDAR reference. The classical input yields a model for fewer
-cars: \ClsACars{} of the \Acars{} cars of A and \ClsBCars{} of the \Bcars{} of B, and \ClsDCars{} and \ClsSCars{}
-cars on three clips of DAIR-V2X-C and four sequences of V2X-Seq-SPD taken from the larger evaluation. On A the models
-reach \ClsAOurs{} against \ClsALab{} for the labelled boxes and \ClsAInput{} for their own input cuboids, on B
-\ClsBOurs{} against \ClsBLab{} and \ClsBInput{}; with eight and nine cars, the intervals of these differences
-include zero. A box of the models' own size scores \ClsAOwn{} on A, above the models: the gain of the shape over
-its dimensions, clear with the precise input, is not reproduced with this one. On the clips of the two datasets the
-models are below the labelled boxes (\ClsDDLab{} and \ClsSDLab{}), and on V2X-Seq-SPD also below their input cuboids
-(\ClsSDInput{}). Fusing the video still helps as before: a single window reaches \ClsASingle{} on A. The heading
-from the motion stays accurate (median error \ClsAHeading{}$^\circ$ on A and \ClsBHeading{}$^\circ$ on B); the
-length is off by a mean of \ClsALerr{}~m on A and \ClsBLerr{}~m on B, and the height by \ClsAHerr{} and
-\ClsBHerr{}~cm (11~cm on B with the precise input). The reconstruction is the same in both evaluations, so the
-difference lies in the input: the cabin is carved from the masks and every window is scaled by its cuboid
-(Sects.~\ref{sec:window} and~\ref{sec:completion}), and the errors of either go directly into the model.
-Figures~\ref{fig:teaser}, \ref{fig:steps}, \ref{fig:cars} and~\ref{fig:large} show models obtained this way.
-
-
 % ------------------------------------------------------------------------------------------------------------------
 \section{Comparison with Other Approaches}\label{sec:comparison}
 
@@ -660,8 +583,7 @@ There is no common benchmark for car \emph{shapes} from roadside video, and publ
 average precision of boxes, not shape IoU against LiDAR; their numbers are not comparable with ours, and we did not
 retrain them. Table~\ref{tab:compare} therefore compares what each family of methods needs and produces.
 Quantitatively, the labelled box and the box of our own size in Table~\ref{tab:main} stand in for a perfect and for a
-size-only box detector: with the precise input our shapes exceed both on A and B, and exceed the labelled box on DAIR-V2X-C and, by a
-smaller margin, on V2X-Seq-SPD (Tables~\ref{tab:large} and~\ref{tab:paired}); end to end from the classical input they do not (Table~\ref{tab:e2e}).
+size-only box detector: our shapes are level with both on A and B and below the labelled box on the further clips.
 
 \input{tables/compare.tex}
 
@@ -679,23 +601,25 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 \section{Limitations}\label{sec:limits}
 
 \begin{itemize}
-\item \emph{Input.} The reconstruction is only as good as its masks and cuboids. The shape results use precise input (SAM~2 masks, LiDAR-fitted cuboids, labelled tracks; Sect.~\ref{sec:input}), so they measure the learning-free reconstruction and not a complete learning-free system. End to end from the video alone the models are level with the labelled boxes on A and B and below them on seven further clips, they do not improve on their own input cuboids, and fewer cars get a model (Table~\ref{tab:e2e}). The classical input misses or
-  merges cars in dense traffic (Table~\ref{tab:classical}); a stronger detector and segmenter can replace it. Stopped
-  objects have no parallax and are not reconstructed, and 26 of 224 cars of the larger evaluation are occluded too often to have
-  five windows.
+\item \emph{Input.} The reconstruction is only as good as its masks and cuboids. With the classical input the models
+  are level with the labelled boxes on A and B and below them on the further clips, and they do not improve on their
+  own input cuboids (Table~\ref{tab:main}). The classical input misses or merges cars in dense traffic
+  (Table~\ref{tab:classical}), so that \ClsACars{} of the 24 cars of A get a model; a stronger detector and segmenter
+  can replace it, which we did not evaluate. Stopped objects have no parallax and are not reconstructed.
+\item \emph{Sample.} \ClsTotalCars{} cars are scored, eight and nine of them on the two intersections; the
+  intervals are wide, and there is no ablation of the parts of the method on this input.
 \item \emph{Slow cars.} A car that creeps through the intersection for a long time is seen in many windows whose
-  small misalignments along its path add up: on the busiest intersection of V2X-Seq-SPD the cars come out a median of
-  0.5~m too long, and the gain over the labelled box is smallest there.
+  small misalignments along its path add up, and it comes out too long.
 \item \emph{Completion.} A car never seen side-on, typically one seen only from behind, takes its length from the
   cuboid and its profile from its body type: its length is not measured from the video.
 \item \emph{Synchronisation.} Where camera and LiDAR are not synchronised (intersection B), the model, valid at the
   camera's time, is offset along the path from the label, valid at the LiDAR's; the shape, compared in the car's own
   frame, is not affected, the position is.
-\item \emph{Tuning.} The parameters were chosen on the \Alabels{} cars of intersection A; B and five clips of the
-  larger evaluation informed three choices (Sect.~\ref{sec:protocol}), and the clips that informed none give a similar
-  result. All intersections are in one city, the two datasets share them, and all use the same kind of camera.
-\item \emph{Pedestrians and cyclists} are shown on a few examples. A walking person has too few rigid points to be
-  triangulated; the symmetric carve of its masks is right in height but too deep across the walk.
+\item \emph{Tuning.} The parameters were chosen on intersection A with more precise masks and cuboids than the
+  classical ones, and B and clips of the two datasets informed three choices (Sect.~\ref{sec:protocol}); no set is a
+  clean hold-out. All intersections are in one city, the two datasets share them, and all use the same kind of camera.
+\item \emph{Other road users.} Only cars are evaluated. Pedestrians and cyclists are thin and partly non-rigid, and
+  the classical input finds them in too few frames; they are left to future work.
 \item \emph{Run time.} The reference Python implementation needs one to two minutes per window on a single CPU core and a
   few minutes per car for the track solve; the classical input takes about 6~s per frame (the 250 frames of A in
   about 25 minutes). Neither is optimised.
@@ -704,15 +628,18 @@ calibrated camera and enough motion, and it reconstructs a car only after it has
 % ------------------------------------------------------------------------------------------------------------------
 \section{Conclusion}
 
-From a single fixed, elevated roadside camera, the 3D shapes of the objects that move past it can be triangulated from their masks and cuboids with no learned step: given precise masks and cuboids and measured against the cars' own LiDAR at up to 70~m, the car models
-are ahead of the labelled 3D boxes on both intersections the method was developed on and on \DairCars{} cars of
-DAIR-V2X-C, and by a smaller margin on \SpdCars{} cars of V2X-Seq-SPD. Three ingredients carry it: the object's own
-motion, which turns one camera into many views of its textured surface; all frames that see the object, solved as one rigid
-body and completed by symmetry and by the masks' carve; and, only where the video never measured the length, the cuboid. As
-only symmetry is assumed, the same steps give cyclists, motorcyclists and pedestrians. The evaluation also shows that
-the raw accumulated LiDAR is a biased reference at long range and should be closed before it is used to compare
-shapes. The masks and cuboids can come from any source; those of these results came from SAM~2 and the LiDAR. With the classical input described here, from the video alone, the same reconstruction is level with the labelled boxes on the two intersections and below them on other clips, and it no longer improves on its input cuboid: the quality of the masks and cuboids, not the reconstruction, sets the result, and a stronger
-detector can replace it where needed.
+From a single fixed, elevated roadside camera, the 3D shapes of the cars that move past it can be triangulated from
+the video alone, with no learned step: the masks and cuboids come from a classical method, and the reconstruction
+adds the shape inside the cuboid. Measured against the cars' own LiDAR at up to 70~m, the models are level with the
+labelled 3D boxes on the two intersections the method was developed on (\ClsAOurs{} against \ClsALab{}, and
+\ClsBOurs{} against \ClsBLab{}) and below them on \ClsDCars{} cars of DAIR-V2X-C and \ClsSCars{} cars of
+V2X-Seq-SPD; they are far ahead of a single window, and they do not yet improve on their own input cuboids. Three
+ingredients carry the reconstruction: the object's own motion, which turns one camera into many views of its
+textured surface; all frames that see the object, solved as one rigid body and completed by symmetry and by the
+masks' carve; and, only where the video never measured the length, the cuboid. Its result follows the quality of the
+masks and cuboids, which is where the chain from the video alone has the most to gain. The evaluation also shows
+that the raw accumulated LiDAR is a biased reference at long range and should be closed before it is used to
+compare shapes.
 
 \subsubsection*{Code availability.} The code of the method, the tables and the figures is available in
 the GitHub repository RoadsideCarShape \cite{code}.

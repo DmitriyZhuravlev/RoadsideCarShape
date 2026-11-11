@@ -1,0 +1,23 @@
+\begin{table}[t]
+\centering
+\caption{The same evaluation per clip, no parameter changed: mean solid IoU of our models and of the labelled boxes against the raw and the gap-closed LiDAR, of the input cuboids against the gap-closed one, and the median error of the car's centre along the viewing ray.}
+\label{tab:clips}
+\footnotesize
+\begin{tabular}{llrcccccc}
+\toprule
+ & & & \multicolumn{2}{c}{raw LiDAR} & \multicolumn{3}{c}{closed LiDAR} & along \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-8}
+ & clip & cars & ours & box & ours & box & input & ray (m) \\
+\midrule
+intersection A & V2X-Seq-SPD 0058 & 8 & 0.414 & 0.374 & 0.589 & 0.572 & 0.552 & 0.82 \\
+intersection B & DAIR-V2X-C example & 9 & 0.357 & 0.322 & 0.507 & 0.508 & 0.504 & 2.22 \\
+DAIR-V2X-C & clip 114 & 4 & 0.596 & 0.501 & 0.702 & 0.633 & 0.599 & 1.96 \\
+ & clip 105 & 8 & 0.412 & 0.416 & 0.531 & 0.547 & 0.491 & 2.17 \\
+ & clip 52 & 12 & 0.596 & 0.635 & 0.580 & 0.697 & 0.671 & 2.21 \\
+V2X-Seq-SPD & seq. 0054 & 9 & 0.481 & 0.529 & 0.618 & 0.687 & 0.651 & 0.80 \\
+ & seq. 0059 & 8 & 0.375 & 0.393 & 0.513 & 0.531 & 0.482 & 0.42 \\
+ & seq. 0077 & 2 & 0.454 & 0.405 & 0.679 & 0.543 & 0.598 & 1.75 \\
+ & seq. 0002 & 11 & 0.559 & 0.702 & 0.510 & 0.724 & 0.690 & 2.33 \\
+\bottomrule
+\end{tabular}
+\end{table}
