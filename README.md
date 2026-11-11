@@ -30,11 +30,11 @@ masks and cuboids and the coverage: 8 of the 24 cars of A with a LiDAR reference
 ## Contents
 
 - `main.tex` - the article (LNCS), `springer/` - the version for EURASIP Journal on Image and Video Processing
-  (Springer Nature template, `scripts/make_springer.py`), `references.bib`, `figures/`, `tables/`, `tables_cls/`.
+  (Springer Nature template, `scripts/sync_springer.py`), `references.bib`, `figures/`, `tables/`, `tables_cls/`.
 - `code/` - a snapshot of the pipeline (from the research repository 3dseg), with its README.
 - `scripts/` - tables and figures of the article from the results of the code.
 
-Build: `latexmk -pdf main.tex`; the journal version: `python scripts/make_springer.py`, then `latexmk -pdf main.tex`
+Build: `latexmk -pdf main.tex`; the journal version: `python scripts/sync_springer.py` (copies the abstract and body of `main.tex` into `springer/main.tex`), then `latexmk -pdf main.tex`
 in `springer/`.
 
 ## Reproducing the tables and figures

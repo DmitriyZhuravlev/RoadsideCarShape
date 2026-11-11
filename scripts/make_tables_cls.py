@@ -15,7 +15,7 @@ SETS = [("A", "A", [("Acls", "e2e")]), ("B", "B", [("B", T)]),
         ("D", "DAIR-V2X-C", [(n, T) for n in ("c114", "c105", "c52")]),
         ("S", "V2X-Seq-SPD", [(n, T) for n in ("s0054", "s0059", "s0077", "s0002")])]
 CLIPS = [("intersection A", "V2X-Seq-SPD 0058", ("Acls", "e2e")), ("intersection B", "DAIR-V2X-C example", ("B", T)),
-         ("DAIR-V2X-C", "clip 114", ("c114", T)), ("", "clip 105", ("c105", T)), ("", "clip 52", ("c52", T)),
+         ("DAIR-V2X-C", "clip 114\\_0", ("c114", T)), ("", "clip 105\\_0", ("c105", T)), ("", "clip 52\\_1", ("c52", T)),
          ("V2X-Seq-SPD", "seq. 0054", ("s0054", T)), ("", "seq. 0059", ("s0059", T)), ("", "seq. 0077", ("s0077", T)),
          ("", "seq. 0002", ("s0002", T))]
 KEYS = [("Ours", "fused closed: iou"), ("Lab", "box label closed: iou"), ("Own", "box own closed: iou"),
