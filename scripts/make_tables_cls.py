@@ -1,6 +1,6 @@
 """The article's result tables: car models reconstructed from the classical input (masks and cuboids from the video
 alone, 3dseg classical_input) scored against the cars' LiDAR. Reads 3dseg docs/whole_scene_cars_ann_<run>_<tag>.json
-(improve_runs/cls_fusion.sh; tag fb: convex-hull silhouettes, model bounded by its input cuboid) and writes
+(improve_runs/cls_fusion.sh; tag fb_noba: convex-hull silhouettes, model confined to its input cuboid, windows\naligned without a joint solve of the track) and writes
 tables_cls/main_table.tex, clips_table.tex, ablation.tex and numbers.tex (macros \\Cls<set>...).
 
 Every car counts once: DAIR-V2X-C clips 105_0 and 52_1 show the same video as V2X-Seq-SPD sequences 0059 and 0002, so
@@ -13,7 +13,7 @@ import numpy as np
 
 DOCS = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tables_cls")
-T = "fb"
+T = "fb_noba"
 FURTHER = ("c114", "s0054", "s0059", "s0077", "s0002")
 SETS = [("A", "intersection A", ("Acls",)), ("B", "intersection B", ("B",)), ("F", "further clips", FURTHER),
         ("T", "all", ("Acls", "B") + FURTHER)]
@@ -27,10 +27,11 @@ KEYS = [("Ours", "fused closed: iou"), ("Lab", "box label closed: iou"), ("Own",
         ("LabScanned", "box label closed: scanned_iou"), ("FieldErr", "fused closed: height_err_cm"),
         ("LabFieldErr", "box label closed: height_err_cm"), ("InputFieldErr", "box input closed: height_err_cm")]
 TABLE = ("Ours", "Lab", "Own", "Input", "Single")
-ABLATION = [("full method", "fb"), ("silhouette: the mask", "bound"), ("not confined to the cuboid", "f3"),
-            ("neither of the two", None), ("no cabin carve", "fb_nocabin"),
-            ("no joint solve", "fb_noba"), ("no symmetry", "fb_nosym"),
-            ("no roof edge", "fb_noroof"), ("no cuboid completion", "fb_noprior")]
+ABLATION = [("full method", "fb_noba"), ("silhouette: the mask", "nb_mask"), ("not confined to the cuboid", "nb_unbound"),
+            ("no cabin carve", "nb_nocabin"), ("no symmetry", "nb_nosym"), ("no roof edge", "nb_noroof"),
+            ("no cuboid completion", "nb_noprior"), ("with a joint solve of the track", "fb")]
+ABL_KEY = {"fb_noba": "Full", "nb_mask": "Mask", "nb_unbound": "Unbound", "nb_nocabin": "Nocabin", "nb_nosym": "Nosym",
+           "nb_noroof": "Noroof", "nb_noprior": "Noprior", "fb": "Joint"}
 
 
 def paired_ci(d, n_boot=5000, seed=0):
@@ -143,7 +144,7 @@ def main():
                 common = sorted(set(C) & set(full[s]))
                 d = paired_ci([C[k]["fused closed: iou"] - full[s][k]["fused closed: iou"] for k in common])
                 cells.append("--" if tag == T else fmt_ci(*d[:3]))
-                key = {"fb": "Full", "bound": "Mask", "f3": "Unbound", None: "First"}.get(tag) or tag[3:].capitalize()
+                key = ABL_KEY[tag]
                 macros[f"ClsAbl{key}"] = f"{cells[-2]:.3f}"
                 macros[f"ClsAblD{key}"] = cells[-1]
         rows.append(ablation_row(name, cells))

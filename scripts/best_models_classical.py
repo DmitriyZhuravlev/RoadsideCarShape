@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/s
 import cars_figure as cf
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
 CLIPS = os.path.expanduser("~/Documents/MyArticles/improve_runs/clips")
-SUFFIX = "_fb"
+SUFFIX = "_fb_noba"
 # (dataset, classical run name, label, clip folder in improve_runs/clips)
 PICK = [("DAIR-V2X-C", "c52", "000126", "c52"), ("V2X-Seq-SPD", "s0002", "001486", "s0002"),
         ("DAIR-V2X-C", "c52", "000163", "c52"), ("V2X-Seq-SPD", "s0002", "001528", "s0002"),

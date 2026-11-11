@@ -9,25 +9,26 @@ Monocular 3D perception for roadside cameras is almost always a learned box dete
 **shape** of the cars that pass a fixed, calibrated camera with classical geometry only. A classical method finds
 the mask and the 3D cuboid of every moving car in the video (background subtraction, optical flow, tangents from the
 vanishing points). In short windows of the video every car is then triangulated and its planar motion and the depth
-of every vertex are solved jointly; over the whole video the windows of one car are solved together as one rigid
-car, mirrored about its symmetry plane, averaged as a robust height field and completed by a visual hull of the
+of every vertex are solved jointly; over the whole video the windows of one car are aligned in one car frame,
+mirrored about its symmetry plane, averaged as a robust height field and completed by a visual hull of the
 masks. No step is learned; LiDAR and 3D labels are used for evaluation only.
 
 | Data (cars scored) | ours | labelled box | input cuboid | best single window |
 | :--- | :---: | :---: | :---: | :---: |
-| V2X-Seq-SPD example, intersection A (8; tuning) | 0.624 | 0.572 | 0.552 | 0.275 |
-| DAIR-V2X-C example, intersection B (9) | 0.512 | 0.508 | 0.504 | 0.401 |
-| five further clips of both datasets (34) | 0.598 | 0.647 | 0.615 | 0.295 |
-| all (51) | 0.587 | 0.611 | 0.585 | 0.311 |
+| V2X-Seq-SPD example, intersection A (10; tuning) | 0.648 | 0.579 | 0.562 | 0.287 |
+| DAIR-V2X-C example, intersection B (10) | 0.544 | 0.519 | 0.512 | 0.367 |
+| five further clips of both datasets (34) | 0.615 | 0.647 | 0.615 | 0.290 |
+| all (54) | 0.608 | 0.611 | 0.586 | 0.303 |
 
 Mean solid IoU of the height fields against the cars' accumulated LiDAR with the gaps between scan lines closed; the
 labelled boxes, the input cuboids of the classical method and the best single window are scored the same way on the
 same cars, and every car counts once (two DAIR-V2X-C clips show the same video as V2X-Seq-SPD sequences and are
 reported only as repeats). Over all cars the models are level with the labelled boxes (paired difference
--0.024 [-0.066, +0.017], 95 % bootstrap interval) and with their input cuboids (+0.002 [-0.036, +0.039]); their
-surface is closer to the LiDAR in height than the cuboids' flat top (28 against 37 cm). The ablation shows that the
-cabin carved from the silhouettes carries the method, while the joint solve of a track and the symmetry do not
-improve the IoU with classical masks. The main limits are the classical masks and cuboids and the coverage: 8 of the
+-0.003 [-0.031, +0.025], 95 % bootstrap interval) and ahead of their input cuboids on the two intersections
+(+0.085 [+0.027, +0.139] on A, +0.033 [+0.016, +0.052] on B; +0.022 [-0.005, +0.050] over all cars); their
+surface is closer to the LiDAR in height than the cuboids' flat top (28 against 36 cm). The ablation shows that the
+cabin carved from the silhouettes carries the method; a joint solve of all windows of a car as one rigid body did
+not pay off with classical masks and is not part of the method. The main limits are the classical masks and cuboids and the coverage: 10 of the
 24 cars of A with a LiDAR reference get a model. A pedestrian, a cyclist and a motorcyclist are shown as coarse
 models from their silhouettes alone.
 

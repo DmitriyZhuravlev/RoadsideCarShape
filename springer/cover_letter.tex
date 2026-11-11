@@ -19,15 +19,15 @@ needs thousands of labelled boxes from the same kind of camera. The manuscript p
 triangulation of the cars that move past a fixed, calibrated, elevated camera. A classical method obtains a mask and
 a 3D cuboid of each moving car per frame from the video alone. The orientation of each car comes from its motion; in
 short windows of the video its masked surface is triangulated, its planar rigid motion and the depth of every vertex
-solved jointly, with the scale from the cuboid; the windows of one car are then solved together as one rigid body,
-mirrored about its symmetry plane, and completed by the visual hull of its masks. No step is learned. On 51 cars of
+solved jointly, with the scale from the cuboid; the windows of one car are then aligned in one car frame,
+mirrored about its symmetry plane, and completed by the visual hull of its masks. No step is learned. On 54 cars of
 two public datasets, scored against the cars' accumulated LiDAR, the models are level with the labelled 3D boxes
-(a mean solid IoU of 0.587 against 0.611, paired difference $-0.024$ $[-0.066, +0.017]$) and with the cuboids of the
-classical input, far above a single window (0.311), and closer to the LiDAR surface in height than the cuboids. An
+(a mean solid IoU of 0.608 against 0.611, paired difference $-0.003$ $[-0.031, +0.025]$), ahead of the cuboids of
+the classical input on the two intersections it was developed on, far above a single window (0.303), and closer to the LiDAR surface in height than the cuboids. An
 ablation reports what each part contributes, including the parts that do not pay off with classical masks. The
 evaluation also shows that the raw accumulated LiDAR is a strongly biased reference at long range, against which
 the labelled box itself scores only 0.37, and the manuscript reports its limits openly: the classical masks and
-cuboids limit the result, a third of the cars of the tuning intersection get a model, and other road users are
+cuboids limit the result, ten of the 24 cars of the tuning intersection get a model, and other road users are
 shown only as coarse examples.
 
 I believe the work suits the journal because it is image and video processing in the classical sense: multi-view
