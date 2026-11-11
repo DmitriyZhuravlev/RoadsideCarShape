@@ -118,7 +118,7 @@ def panel(img, title, size=(420, 280), strip=26):
 
 
 def main():
-    models = pickle.load(open(os.path.join(FIG, "models_A.pkl"), "rb"))
+    models = pickle.load(open(os.path.join(FIG, os.environ.get("MODELS_PKL_NAME", "models_A.pkl")), "rb"))
     good = [n for n, m in models.items() if "fused closed: iou" in m["row"] and m["vcol"] is not None]
     seq = vs.Sequence()
     pick = {}
@@ -173,7 +173,7 @@ def main():
                                panel(novel, "our model, new viewpoint"),
                                panel(withl, f"with its LiDAR (red), IoU {r['fused closed: iou']:.2f}")]))
     out = np.vstack(rows)
-    cv2.imwrite(os.path.join(FIG, "cars_best.png"), out)
+    cv2.imwrite(os.path.join(FIG, os.environ.get("OUT_NAME", "cars_best.png")), out)
     print(out.shape)
 
 

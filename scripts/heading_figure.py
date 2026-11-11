@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.expanduser("~/Documents/MyArticles/code/3dseg")); os.
 import v2x_seq_shape as vs
 FIG = os.path.expanduser("~/Documents/MyArticles/RoadsideCarShape/figures")
 TURN = sys.argv[1] if len(sys.argv) > 1 else "003981"
-models = pickle.load(open(os.path.join(FIG, "models_A.pkl"), "rb"))
+models = pickle.load(open(os.path.join(FIG, os.environ.get("MODELS_PKL_NAME", "models_A.pkl")), "rb"))
 seq = vs.Sequence()
 
 
@@ -48,5 +48,5 @@ turn = next(m for m in models.values() if m["row"].get("label") == TURN)
 e = draw(b, turn, 6, 2.0)
 b.set_aspect("equal"); b.set_xlabel("x (m)"); b.set_ylabel("y (m)")
 b.set_title(f"(b) car {TURN} turning: median heading error {np.degrees(np.median(e)):.1f}$^\\circ$", fontsize=10)
-plt.tight_layout(); plt.savefig(os.path.join(FIG, "heading.png"), dpi=150)
+plt.tight_layout(); plt.savefig(os.path.join(FIG, os.environ.get("OUT_NAME", "heading.png")), dpi=150)
 print("cars", len(errs), "median of per-car medians %.1f deg" % np.degrees(np.median(errs)), os.path.join(FIG, "heading.png"))

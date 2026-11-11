@@ -18,9 +18,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import v2x_seq_demo as vd  # noqa: E402
 
 D = os.path.expanduser("~/Documents/MyArticles/code/3dseg/docs")
-RUN, LAB, K_WIN = "ann_P_clip_114_0_all", "000046", int(os.environ.get("K_WIN", "142"))
-RUN_COL = RUN + "_fill"     # the same model, subdivided and coloured (MESH_SUBDIV=2, FILL_UP=1)
-DUMPS = f"{D}/ann_objects_P_clip_114_0_all"
+RUN = os.environ.get("RUN", "ann_P_clip_114_0_all")
+LAB = os.environ.get("LAB", "000046")
+K_WIN = int(os.environ.get("K_WIN", "142"))
+RUN_COL = os.environ.get("RUN_COL", RUN + "_fill")  # the same model, subdivided and coloured (MESH_SUBDIV=2, FILL_UP=1)
+DUMPS = os.environ.get("DUMPS", f"{D}/ann_objects_P_clip_114_0_all")
+TID = os.environ.get("TID", LAB)                       # the car's track id in the dumped windows
+OUT_NAME = os.environ.get("OUT_NAME", "teaser.png")
 GRID = float(os.environ.get("GRID", "0.14"))               # m: vertex clustering of the shown mesh
 W, H = 1400, 788                                            # panel size, 16:9
 BLUE = (168, 95, 31)                                        # BGR of #1f5fa8
@@ -83,7 +87,7 @@ def model(run):
 
 
 # (a) the video frame around the car, framed by its body in one window
-o = next(x for x in pickle.load(open(f"{DUMPS}/{K_WIN:04d}.pkl", "rb")) if x["track_tid"] == LAB)
+o = next(x for x in pickle.load(open(f"{DUMPS}/{K_WIN:04d}.pkl", "rb")) if x["track_tid"] == TID)
 fids = vd.load_sequence()[0]
 frame = cv2.imread(os.path.join(vd.DATA, "image", f"{fids[K_WIN]}.jpg"))
 b = o["uv"][o["body"]]
@@ -126,7 +130,7 @@ high = lambda a: cf.render_mesh(np.full((H, W, 3), 255, np.uint8), hcam(a)[0], V
 imgs = [cv2.cvtColor(x, cv2.COLOR_BGR2RGB) for x in (crop, mesh, high(A_VIEW), high(A_VIEW + 180))]
 titles = ["(a) video frame", "(b) model, triangle mesh, front left", "(c) model, front left",
           "(d) model, rear right"]
-out = os.path.join(RSC, "figures", "teaser.png")
+out = os.path.join(RSC, "figures", OUT_NAME)
 compose_2x2(imgs, titles, out)
 print(out, "frame", fids[K_WIN], "mesh shown", len(Fm), "of", n_full, "triangles",
       {k: r[k] for k in ("track", "windows", "length", "label_length", "fused closed: iou")})

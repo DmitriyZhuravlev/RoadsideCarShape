@@ -27,7 +27,7 @@ def window_object(k, uv):
 
 
 def main():
-    models = pickle.load(open(os.path.join(cf.FIG, "models_A.pkl"), "rb"))
+    models = pickle.load(open(os.path.join(cf.FIG, os.environ.get("MODELS_PKL_NAME", "models_A.pkl")), "rb"))
     by_label = {m["row"].get("label"): n for n, m in models.items()}
     tracks = [by_label[a] if a in by_label else int(a) for a in sys.argv[1:]] or [1, 3]
     seq = vs.Sequence()
@@ -87,7 +87,7 @@ def main():
                                cf.panel(one, f"one window ({len(T)} triangles), new view"),
                                cf.panel(fused, f"fused over {r['windows']} windows, same view")]))
         print(n, r["label"], "frame", k, "fit", round(fit, 2), "triangles", len(T))
-    cv2.imwrite(os.path.join(cf.FIG, "method_steps.png"), np.vstack(rows))
+    cv2.imwrite(os.path.join(cf.FIG, os.environ.get("OUT_NAME", "method_steps.png")), np.vstack(rows))
 
 
 if __name__ == "__main__":
