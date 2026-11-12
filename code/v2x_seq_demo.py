@@ -33,6 +33,64 @@ import numpy as np
 import lifting
 
 REPO = os.path.dirname(os.path.abspath(__file__))
+# the calibration's LiDAR-to-camera "rotation" is not one: its second row (the image's vertical) has norm ~0.83 and
+# leans on the optical axis - right on the road (it was fitted there), but every height projects ~17 % short (labelled
+# 2D boxes are 1.13-1.21x the projected 3D boxes). CAM_ORTHO: the rigid camera (a true rotation, the same K) that
+# projects the road plane as the given one does (fit_rigid_to_ground); heights then come out right
+CAM_ORTHO = os.environ.get("CAM_ORTHO", "1") == "1"   # 0: the calibration as given (the old results)
+_RIGID = {}
+
+
+def nearest_rotation(R):
+    """Orthogonal Procrustes / polar-decomposition solution: the rotation closest to R in the Frobenius norm (SVD,
+    the sign fixed so that the determinant is +1)."""
+    U, s, Vt = np.linalg.svd(R)
+    Q = U @ Vt
+    if np.linalg.det(Q) < 0:
+        Vt[-1] *= -1
+        Q = U @ Vt
+    return Q.astype(float)
+
+
+def ground_camera(K, R, t, ground):
+    """(K, R, t) of the LiDAR-to-camera calibration in the world whose road is z = 0 (the LiDAR frame shifted by
+    `ground`): with CAM_ORTHO the rigid camera that projects the road as the calibration does (cached per calibration)."""
+    t_w = t + ground * R[:, 2]
+    if not CAM_ORTHO:
+        return K, R, t_w
+    key = (R.tobytes(), t_w.tobytes(), K.tobytes())
+    if key not in _RIGID:
+        _RIGID[key] = fit_rigid_to_ground(K, R, t_w)
+    Ro, to, _ = _RIGID[key]
+    return K, Ro, to
+
+
+def fit_rigid_to_ground(K, R, t, n=40, z_range=(5.0, 150.0)):
+    """The orthonormal camera (Ro, to) projecting the road plane z = 0 as the given (R, t) does: a grid of pixels over
+    the lower image back-projected onto the road with the given camera, then the 6-DoF pose (rotation vector,
+    translation) fitted to reproduce them (least squares, from the nearest rotation).  Returns (Ro, to, rms_px)."""
+    from scipy.optimize import least_squares
+    from scipy.spatial.transform import Rotation
+    W, H = 2 * K[0, 2], 2 * K[1, 2]
+    U, V = np.meshgrid(np.linspace(0.05 * W, 0.95 * W, n), np.linspace(0.35 * H, 0.98 * H, n))
+    q = np.stack([U.ravel(), V.ravel(), np.ones(U.size)], 1)
+    C = -np.linalg.solve(R, t)
+    d = np.linalg.solve(R, np.linalg.solve(K, q.T)).T
+    with np.errstate(divide="ignore", invalid="ignore"):
+        s_ = -C[2] / d[:, 2]
+    X = C + s_[:, None] * d
+    depth = (X @ R.T + t)[:, 2]
+    ok = (d[:, 2] < 0) & (s_ > 0) & (depth > z_range[0]) & (depth < z_range[1])
+    X, uv = X[ok], q[ok, :2]
+
+    def res(x):
+        Pc = X @ Rotation.from_rotvec(x[:3]).as_matrix().T + x[3:]
+        p = Pc @ K.T
+        return (p[:, :2] / p[:, 2:3] - uv).ravel()
+    sol = least_squares(res, np.r_[Rotation.from_matrix(nearest_rotation(R)).as_rotvec(), t], x_scale="jac")
+    return Rotation.from_rotvec(sol.x[:3]).as_matrix(), sol.x[3:], float(np.sqrt(np.mean(sol.fun ** 2)))
+
+
 DATA = os.environ.get("V2X_SEQ_DIR", os.path.join(REPO, "..", "..", "dataset", "spd", "V2X-Seq-SPD-Example",
                                                   "infrastructure-side"))
 OUT_DIR = os.path.join(REPO, "docs")
@@ -119,7 +177,7 @@ def load_sequence():
         K = np.array(json.load(open(os.path.join(DATA, "calib", "camera_intrinsic", f"{f}.json")))["cam_K"]).reshape(3, 3)
         ex = json.load(open(os.path.join(DATA, "calib", "virtuallidar_to_camera", f"{f}.json")))
         R, t = np.array(ex["rotation"]), np.array(ex["translation"]).ravel()
-        cams.append((K, R, t + ground * R[:, 2]))  # world = LiDAR frame shifted so that the ground is Z = 0
+        cams.append(ground_camera(K, R, t, ground))  # world = LiDAR frame shifted so that the ground is Z = 0
     tracks = {}
     for k, f in enumerate(fids):
         for o in json.load(open(os.path.join(DATA, "label", "camera", f"{f}.json"))):

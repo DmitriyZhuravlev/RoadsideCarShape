@@ -29,7 +29,7 @@ LAMBDA = 10.0                      # as in whole_scene.py
 W_ANCHOR, W_MOTION = 30.0, 20.0
 W_CONTACT = 3.0
 W_NONHOLO = 30.0
-MAX_NFEV = 40
+MAX_NFEV = int(os.environ.get("MAX_NFEV", "40"))    # cap on the track solve's evaluations (it stops there: see ba_info)
 
 
 def rot(th):
@@ -275,5 +275,6 @@ def adjust(seq, track, pos, head, max_nfev=MAX_NFEV, drop_outline=False):
         d["X"][:n] = X[a:a + n]                     # filled vertices (after the solve) keep their depths
         d["ba_pose"] = Q[fidx[d["ks"][d["r"]]]].copy()
     track[0][1]["ba_info"] = {"frames": nf, "obs": int(m), "px_before": float(before), "px_after": float(after),
-                              "nfev": int(sol.nfev)}
+                              "nfev": int(sol.nfev), "max_nfev": int(max_nfev), "status": int(sol.status),
+                              "cost": float(sol.cost), "optimality": float(sol.optimality)}
     return True

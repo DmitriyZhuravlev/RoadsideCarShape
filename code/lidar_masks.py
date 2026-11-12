@@ -24,6 +24,7 @@ import mix3d as mx
 import v2x_seq_shape as vs
 
 VOX = 0.05
+LIDAR_BOX = os.environ.get("LIDAR_BOX", "0") == "1"   # evaluation: the reference in boxes fitted to the LiDAR (lidar_boxes.py)
 INK = "#1f1f1e"
 
 
@@ -45,6 +46,21 @@ class LidarShapes:
         self.solids = {}
 
     def solid(self, tid, step=2):
+        if tid not in self.solids and LIDAR_BOX:
+            # the car's own points in the box fitted to them frame by frame (lidar_boxes.py), not in the labels' boxes
+            import lidar_boxes
+            if not hasattr(self, "lboxes"):
+                self.lboxes = lidar_boxes.LidarBoxes(self.seq, self.ground)
+            b = self.lboxes.track(tid)
+            if b["fitted"]:
+                P = np.vstack([b["cloud"], b["cloud"] * [1, -1, 1]])
+                l, w, h = b["dims"]
+                vs_vox = vs.VOX
+                vs.VOX = VOX
+                axes = vs.grid(l, w, max(h, 1.6))
+                vs.VOX = vs_vox
+                occ = vs.height_field(points_to_occupancy(P[P[:, 2] > 0.05], axes))
+                self.solids[tid] = (occ, axes, len(P))
         if tid not in self.solids:
             q = self.seq.tracks[tid]
             pts = [mx.to_ground_frame(cfp.lidar_on_car(self.seq, o, self.ground), o) for o in q[::step]]

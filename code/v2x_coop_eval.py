@@ -99,7 +99,7 @@ def load_coop():
         K = np.array(json.load(open(os.path.join(COOP, d["calib_camera_intrinsic_path"])))["cam_K"]).reshape(3, 3)
         ex = json.load(open(os.path.join(COOP, d["calib_virtuallidar_to_camera_path"])))
         R, t = np.array(ex["rotation"]), np.array(ex["translation"]).ravel()
-        cams.append((K, R, t + ground * R[:, 2]))
+        cams.append(vd.ground_camera(K, R, t, ground))     # CAM_ORTHO: the rigid camera (v2x_seq_demo)
         objs = []
         for o in json.load(open(os.path.join(COOP, d["label_camera_std_path"]))):
             if o["type"] not in ("Car", "Van"):

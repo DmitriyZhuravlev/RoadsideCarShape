@@ -49,6 +49,7 @@ BLURS = (0.7, None)        # reflection test variants per object (blurred mirror
 BLUR = 0.7                 # the one in use: the variant whose model explains the held-out frames best is kept
 W_MAX = float(os.environ.get("W_MAX", "0.6"))     # m: width prior (the depth along a side view is barely observed)
 ELLIPSE = os.environ.get("ELLIPSE", "1") == "1"    # elliptic horizontal sections (thin at the ends, round, not a slab)
+GRABCUT = os.environ.get("GRABCUT", "0") == "1"    # refine each silhouette by GrabCut seeded with it (off: as published)
 
 
 # --- data ---------------------------------------------------------------------------------------------------------
@@ -235,6 +236,40 @@ def silhouette(img, bg, pred, clip=False):
     full = np.zeros(img.shape[:2], bool)
     full[Y0 + by + ys, X0 + bx + xs] = True
     return full, (X0 + bx + xs.min(), Y0 + by + ys.min(), X0 + bx + xs.max() + 1, Y0 + by + ys.max() + 1)
+
+
+def grabcut_silhouette(img, sil, box, margin=0.25, iters=4):
+    """A finer cut of a silhouette: GrabCut (colour models of object and background, graph cut) seeded with the
+    background difference - its eroded core is sure object, the rest of it probable object, the box surroundings
+    probable background and anything beyond 10 % of the box height outside the box sure background. Keeps the parts
+    that touch the seed. (full-frame mask, box) or None."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    X0, Y0 = int(max(0, x0 - margin * w)), int(max(0, y0 - margin * h))
+    X1, Y1 = int(min(img.shape[1], x1 + margin * w)), int(min(img.shape[0], y1 + margin * h))
+    seed = sil[Y0:Y1, X0:X1]
+    gc = np.full(seed.shape, cv2.GC_PR_BGD, np.uint8)
+    gc[seed] = cv2.GC_PR_FGD
+    gc[cv2.erode(seed.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))) > 0] = cv2.GC_FGD
+    yy, xx = np.mgrid[Y0:Y1, X0:X1]
+    d = 0.1 * h
+    gc[(xx < x0 - d) | (xx > x1 + d) | (yy < y0 - d) | (yy > y1 + d)] = cv2.GC_BGD
+    if not (gc == cv2.GC_FGD).any():
+        gc[seed] = cv2.GC_FGD
+    try:
+        cv2.grabCut(img[Y0:Y1, X0:X1], gc, None, np.zeros((1, 65)), np.zeros((1, 65)), iters, cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return None
+    fg = ((gc == cv2.GC_FGD) | (gc == cv2.GC_PR_FGD)).astype(np.uint8)
+    n, lab = cv2.connectedComponents(fg, connectivity=8)
+    fg = np.isin(lab, [i for i in np.unique(lab[seed & (fg > 0)]) if i > 0])
+    fg = cv2.morphologyEx(fg.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)) > 0
+    if not fg.any():
+        return None
+    full = np.zeros(sil.shape, bool)
+    full[Y0:Y1, X0:X1] = fg
+    ys, xs = np.nonzero(fg)
+    return full, (X0 + xs.min(), Y0 + ys.min(), X0 + xs.max() + 1, Y0 + ys.max() + 1)
 
 
 def track(fids, k0, box0):
@@ -540,6 +575,8 @@ def reconstruct(tid, fids, cams, labels, camera_xy):
         for k in sorted(lab):
             img = frame(fids, k)
             r = silhouette(img, background(fids, k), box(k), clip=True) if img is not None else None
+            if r is not None and GRABCUT:
+                r = grabcut_silhouette(img, r[0], box(k)) or r
             if r is not None and box_iou(r[1], box(k)) >= 0.5:   # partly hidden (a car in front): skipped
                 sils[k] = r
     else:
